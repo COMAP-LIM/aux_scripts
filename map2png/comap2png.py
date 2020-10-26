@@ -180,6 +180,7 @@ class COMAP2PNG:
 
 
         if USE_CTYPES:  # Ctypes implementation (much faster).
+            raise ValueError("I think something is wrong with the ctypes implementation and don't have time to fix it right now. Use numpy or annoy me into fixing it. -Jonas.")
             self.map_out = np.zeros((ny,nx), dtype=np.float32)
             self.rms_out = np.zeros((ny,nx), dtype=np.float32)
             self.hit_out = np.zeros((ny,nx), dtype=np.int32)
