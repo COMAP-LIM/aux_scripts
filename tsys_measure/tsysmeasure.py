@@ -8,10 +8,8 @@ import time
 import ctypes
 
 class TsysMeasure:
-    verbose = True
-
-    def __init__(self):
-        pass
+    def __init__(self, verbose=False):
+        self.verbose = verbose
 
     def load_data_from_arrays(self, vane_angles, vane_times, array_features, T_hot, tod, tod_times):
         if self.verbose:
@@ -35,6 +33,7 @@ class TsysMeasure:
         self.tod = tod.astype(dtype=np.float32, copy=False)
 
         self.Thot = np.zeros((self.nfeeds, 2), dtype=np.float64)
+        self.Pcold_scanmean = np.zeros((self.nfeeds, self.nbands, self.nfreqs), dtype=np.float32)
         self.Phot = np.zeros((self.nfeeds, self.nbands, self.nfreqs, 2), dtype=np.float64)  # P_hot measurements from beginning and end of obsid.
         self.Phot_unc = np.zeros((self.nfeeds, self.nbands, self.nfreqs, 2), dtype=np.float64)
         self.Phot_t = np.zeros((self.nfeeds, 2), dtype=np.float64)
@@ -62,7 +61,6 @@ class TsysMeasure:
         array_features = f["/hk/array/frame/features"][()]
         tod            = f["/spectrometer/tod"][()].astype(dtype=np.float32, copy=False)
         tod_times      = f["/spectrometer/MJD"][()]
-        feeds          = f["/spectrometer/feeds"][()]
         if tod_times[0] > 58712.03706:
             T_hot      = f["/hk/antenna0/vane/Tvane"][()]
         else:
@@ -80,7 +78,7 @@ class TsysMeasure:
         vane_time1, vane_time2, vane_active1, vane_active2, tod, tod_times = self.vane_time1, self.vane_time2, self.vane_active1, self.vane_active2, self.tod, self.tod_times
         nfeeds, nbands, nfreqs, ntod = self.nfeeds, self.nbands, self.nfreqs, self.ntod
         for i, vane_timei, vane_activei in [[0, vane_time1, vane_active1], [1, vane_time2, vane_active2]]:
-            if np.sum(vane_activei) > 5:  # If Tsys
+            if np.sum(vane_activei) > 5:
                 vane_timei = vane_timei[vane_activei]
                 tod_start_idx = np.argmin(np.abs(vane_timei[0]-tod_times))
                 tod_stop_idx = np.argmin(np.abs(vane_timei[-1]-tod_times))
@@ -103,15 +101,31 @@ class TsysMeasure:
                             self.points_used_Phot[feed_idx, i] = max_idxi - min_idxi
                             self.points_used_Thot[feed_idx, i] = max_idx_vane - min_idx_vane
                             self.successful[feed_idx, i] = True
+        self.Pcold_scanmean = np.zeros((nfeeds, nbands, nfreqs))
+        for feed in range(nfeeds):
+            self.Pcold_scanmean[feed,:,:] = np.nanmean(self.tod[feed,:,:,self.calib_indices_tod[0,0]+1000:self.calib_indices_tod[1,0]-1000], axis=-1)
+        #self.Pcold_scanmean = np.nanmean(self.tod[:,:,:,self.calib_indices_tod[0,0]+1000:self.calib_indices_tod[1,0]-1000], axis=-1)
+        self.Phot_scanmean = np.mean(self.Phot, axis=-1)
+        self.Thot_scanmean = np.mean(self.Thot, axis=-1)
         if self.verbose:
             print("Finished Phot solve in %.2f s" % (time.time()-t0))
+
+
+    def Tsys_single(self):
+        if self.verbose:
+            t0 = time.time()             
+        self.G = (self.Phot_scanmean - self.Pcold_scanmean)/(self.Thot_scanmean[:, None, None] - self.TCMB)
+        self.Tsys = self.Pcold_scanmean/self.G
+        if self.verbose:
+            print("Finished Tsys solve in %.2f s" % (time.time()-t0))
+
 
     def Tsys_of_t(self, t, tod):
         if self.verbose:
             print("Starting Tsys solve")
             t0 = time.time()      
         self.Tsys = np.zeros((self.nfeeds, self.nbands, self.nfreqs, self.ntod), dtype=np.float32)
-        tsyslib = ctypes.cdll.LoadLibrary("/mn/stornext/d16/cmbco/comap/jonas/comap_aux/tsys_measure/tsyslib.so.1")
+        tsyslib = ctypes.cdll.LoadLibrary("/mn/stornext/d16/cmbco/comap/jonas/comap_general/tsys/tsyslib.so.1")
         float64_array1 = np.ctypeslib.ndpointer(dtype=ctypes.c_double, ndim=1, flags="contiguous")
         float32_array4 = np.ctypeslib.ndpointer(dtype=ctypes.c_float, ndim=4, flags="contiguous")
         float64_array2 = np.ctypeslib.ndpointer(dtype=ctypes.c_double, ndim=2, flags="contiguous")
@@ -127,7 +141,6 @@ class TsysMeasure:
         if self.verbose:
             print("Finished Tsys solve in %.2f s" % (time.time()-t0))
         return self.Tsys
-
 
 if __name__ == "__main__":
     obsid = "0014454"
