@@ -125,17 +125,23 @@ class TsysMeasure:
             print("Starting Tsys solve")
             t0 = time.time()      
         self.Tsys = np.zeros((self.nfeeds, self.nbands, self.nfreqs, self.ntod), dtype=np.float32)
-        tsyslib = ctypes.cdll.LoadLibrary("/mn/stornext/d16/cmbco/comap/jonas/comap_general/tsys/tsyslib.so.1")
+        print("1")
+        tsyslib = ctypes.cdll.LoadLibrary("/mn/stornext/d16/cmbco/comap/jonas/comap_aux/tsys_measure/tsyslib.so.1")
+        print("2")
         float64_array1 = np.ctypeslib.ndpointer(dtype=ctypes.c_double, ndim=1, flags="contiguous")
         float32_array4 = np.ctypeslib.ndpointer(dtype=ctypes.c_float, ndim=4, flags="contiguous")
         float64_array2 = np.ctypeslib.ndpointer(dtype=ctypes.c_double, ndim=2, flags="contiguous")
+        float64_array3 = np.ctypeslib.ndpointer(dtype=ctypes.c_double, ndim=3, flags="contiguous")
         float64_array4 = np.ctypeslib.ndpointer(dtype=ctypes.c_double, ndim=4, flags="contiguous")
+        print("3")
 
-        tsyslib.tsys_calc.argtypes = [float32_array4, float32_array4, float64_array2,
+        tsyslib.tsys_calc.argtypes = [float32_array4, float64_array3, float64_array2,
                                     float64_array1, float64_array4, float64_array2,
                                     ctypes.c_double, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
-        tsyslib.tsys_calc(self.Tsys, self.tod, self.Thot, t, self.Phot, self.Phot_t, self.TCMB,
+        print("4")
+        tsyslib.tsys_calc(self.Tsys, self.Pcold_scanmean, self.Thot, t, self.Phot, self.Phot_t, self.TCMB,
                         self.nfeeds, self.nbands, self.nfreqs, self.ntod)
+        print("5")
         self.Tsys[:, :, :, self.calib_indices_tod[0,0]:self.calib_indices_tod[0,1]] = np.nan
         self.Tsys[:, :, :, self.calib_indices_tod[1,0]:self.calib_indices_tod[1,1]] = np.nan
         if self.verbose:
