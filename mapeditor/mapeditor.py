@@ -732,7 +732,7 @@ class Atlas:
                 
                 if self.tool == "coadd":
                     self.C_coadd4D(self.map1, self.nhit1, self.rms1,
-                                    self.map2, self.nhit2, self.rms2)
+                                   self.map2, self.nhit2, self.rms2)
 
                 elif self.tool == "subtract": 
                     self.C_subtract4D(self.map1, self.nhit1, self.rms1,
