@@ -1,5 +1,5 @@
 // Compile as
-// gcc -shared maputilslib.c -o maputilslib.so.1
+// gcc -shared maputilslib.c -o maputilslib.so.1 -fPIC -O3
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
