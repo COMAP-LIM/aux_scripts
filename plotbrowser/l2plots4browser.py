@@ -1,39 +1,41 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+
 import sys
 import numpy.fft as fft
-import time
-import glob
 import os
+import errno
 import h5py
-import multiprocessing
-from scipy.io import FortranFile
+#import multiprocessing
+import tools
+#from scipy.io import FortranFile
 from scipy import stats
-import astropy.coordinates as coord
-from astropy.time import Time
-from scipy import interpolate
-import astropy.units as u
-from astropy.coordinates import SkyCoord
-import subprocess
-import scipy as sp
-import scipy.ndimage
-from astropy.io import fits
+#import astropy.coordinates as coord
+#from astropy.time import Time
+#from scipy import interpolate
+#import astropy.units as u
+#from astropy.coordinates import SkyCoord
+#import scipy as sp
+#import scipy.ndimage
+#from astropy.io import fits
 from scipy.stats import norm
-from scipy.optimize import curve_fit
+#from scipy.optimize import curve_fit
 import copy
-import math
-from astropy.time import Time
-from astropy.coordinates import solar_system_ephemeris, EarthLocation
-from astropy.coordinates import get_body_barycentric, get_body, get_moon
-import healpy as hp
-from matplotlib import cm
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+#import math
+#from astropy.time import Time
+#from astropy.coordinates import solar_system_ephemeris, EarthLocation
+#from astropy.coordinates import get_body_barycentric, get_body, get_moon
+#import healpy as hp
+#from matplotlib import cm
+#from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import argparse
 import re 
 from tqdm import tqdm
 import warnings
 
-warnings.filterwarnings("ignore", category=RuntimeWarning) #ignore warnings caused by weights cut-off
+warnings.filterwarnings("ignore", category = RuntimeWarning) #ignore warnings caused by weights cut-off
+warnings.filterwarnings("ignore", category = UserWarning) #ignore warnings caused by weights cut-off
 
 import accept_mod.stats_list as stats_list
 stats_list = stats_list.stats_list
@@ -95,23 +97,43 @@ class L2plots():
         self.obsIDs = [num.strip() for num in obsIDs]
         self.nobsIDs = len(self.obsIDs)                    # Number of obsIDs in runlist
         
+        dates = re.findall(r"-(20\d{2}-\d{2}-\d{2}-\d+)\.", runlist)         # Regex pattern to find all dates in runlist
+        self.dates = [num.strip() for num in dates]
+        
         scans_per_obsid = re.findall(r"\d\s+(\d+)\s+\/", runlist)
         self.scans_per_obsid = [int(num.strip()) - 2 for num in scans_per_obsid]
 
         param_file.close()
         runlist_file.close()
 
+    def ensure_dir_exists(self, path):
+        try:
+            os.makedirs(path)
+        except OSError as exception:
+            if exception.errno != errno.EEXIST:
+                raise
+
     def run(self):
         ps_chi2, ps_s_feed, ps_s_chi2, ps_o_sb, ps_o_feed, ps_o_chi2 = self.open_scan_data()
         
         for i in tqdm(range(self.nobsIDs)):
-            first_scanid = self.obsIDs[i] + "02"
+            self.obsid = self.obsIDs[i]
+            self.date  = self.dates[i]
+            if int(self.obsid) < 7321:
+                continue
+
+            first_scanid = self.obsid + "02"
             idx = np.argmin(np.abs(self.allscanids - int(first_scanid)))
             start = idx
             stop  = idx + self.scans_per_obsid[i]
 
             self.scanids = self.allscanids[start:stop]
             self.n_scans = len(self.scanids)
+
+            if (self.n_scans == 0):
+                print('No scans in obsid: ' + self.obsid)
+                continue
+
             self.ps_chi2 = ps_chi2[start:stop, ...]
             self.ps_s_feed = ps_s_feed[start:stop, ...]
             self.ps_s_chi2 = ps_s_chi2[start:stop, ...]
@@ -120,12 +142,13 @@ class L2plots():
             self.ps_o_chi2 = ps_o_chi2
             self.plot_ps_chi_data()
             
-            l2data = []
-            for i in range(self.n_scans):
-                self.l2name = f"{self.patch_name}_{self.scanids[i]:09}.h5"
-                print(l2name)
+            self.get_obsid_diagnostics()
             
-            break
+            if len(self.corrs) == 0:
+                print('No working scans in obsid')
+                continue
+            
+            self.plot_obsid_diagnostics()
 
     def open_scan_data(self):
         print("Loading scan data:")
@@ -152,21 +175,25 @@ class L2plots():
         print(ps_chi2.shape, ps_s_feed.shape, ps_s_chi2.shape, ps_o_sb.shape, ps_o_feed.shape, ps_o_chi2.shape)
         return ps_chi2, ps_s_feed, ps_s_chi2, ps_o_sb, ps_o_feed, ps_o_chi2
 
-    def get_corr(self, scan):
-        with h5py.File(scan, mode="r") as my_file:
-            scan_id     = self.l2name[-12:-3]# + filename[-5:-3]
-            tod_ind     = np.array(my_file['tod'][:])
-            n_det_ind, n_sb, n_freq, n_samp = tod_ind.shape
-            sb_mean_ind = np.array(my_file['sb_mean'][:])
-            mask_ind    = my_file['freqmask'][:]
+    def get_corr(self):
+        with h5py.File(f"{self.l2_path}/{self.patch_name}/{self.l2name}", mode = "r") as my_file:
+            self.scan_id       = self.l2name[-12:-3]
+            tod_ind       = np.array(my_file['tod'][:])
+            sb_mean_ind   = np.array(my_file['sb_mean'][:])
+            mask_ind      = my_file['freqmask'][:]
             mask_full_ind = my_file['freqmask_full'][:]
             reason_ind    = my_file['freqmask_reason'][:]
             pixels        = np.array(my_file['pixels'][:]) - 1 
             pix2ind       = my_file['pix2ind'][:]
+            self.windspeed = np.mean(my_file['hk_windspeed'][()])
+            self.feat = my_file['feature'][()]
+            
+            self.n_det_ind, self.n_sb, self.n_freq, self.n_samp = tod_ind.shape
+            
             try: 
                 sd_ind = np.array(my_file['spike_data'])
             except KeyError:
-                sd_ind = np.zeros((3, n_det_ind, n_sb, 4, 1000))
+                sd_ind = np.zeros((3, self.n_det_ind, self.n_sb, 4, 1000))
             try: 
                 chi2_ind = np.array(my_file['chi2'])
             except KeyError:
@@ -176,15 +203,15 @@ class L2plots():
             except KeyError:
                 acc_ind = np.zeros_like(tod_ind[:,:,0,0])
                 print("Found no acceptrate")
-            time = np.array(my_file['time'])
-            mjd = time
+            self.time = np.array(my_file['time'])
+            mjd = self.time
             try:
-                pca      = np.array(my_file['pca_comp'])
-                eigv     = np.array(my_file['pca_eigv'])
+                self.pca      = np.array(my_file['pca_comp'])
+                self.eigv     = np.array(my_file['pca_eigv'])
                 ampl_ind = np.array(my_file['pca_ampl'])
             except KeyError:
-                pca = np.zeros((4, 10000))
-                eigv = np.zeros(0)
+                self.pca = np.zeros((4, self.n_samp))
+                self.eigv = np.zeros(4)
                 ampl_ind = np.zeros((4, *mask_full_ind.shape))
                 print('Found no pca comps')
             try:
@@ -192,24 +219,27 @@ class L2plots():
             except KeyError:
                 tsys_ind = np.zeros_like(tod_ind[:,:,:,0]) + 40
                 print("Found no tsys")
-        t0   = time[0]
-        time = (time - time[0]) * (24 * 60)  # minutes
 
-        n_freq_hr = len(mask_full_ind[0,0])
-        n_det     = np.max(pixels) + 1 
-        # print(n_det)
+        t0   = self.time[0]
+        self.time = (self.time - self.time[0]) * (24 * 60)  # minutes
+        dt = (self.time[1] - self.time[0]) * 60  # seconds
+        self.radiometer = 1 / np.sqrt(31.25 * 10 ** 6 * dt)  # * 1.03
+
+        self.n_freq_hr = len(mask_full_ind[0,0])
+        self.n_det     = np.max(pixels) + 1 
+        # print(self.n_det)
 
         ## transform to full arrays with all pixels
-        tod       = np.zeros((n_det, n_sb, n_freq, n_samp))
-        mask      = np.zeros((n_det, n_sb, n_freq))
-        mask_full = np.zeros((n_det, n_sb, n_freq_hr))
-        acc       = np.zeros((n_det, n_sb))
-        ampl      = np.zeros((4, n_det, n_sb, n_freq_hr))
-        tsys      = np.zeros((n_det, n_sb, n_freq))
-        chi2      = np.zeros((n_det, n_sb, n_freq))
-        sd        = np.zeros((3, n_det, n_sb, 4, 1000))
-        sb_mean   = np.zeros((n_det, n_sb, n_samp))
-        reason    = np.zeros((n_det, n_sb, n_freq_hr))
+        tod       = np.zeros((self.n_det, self.n_sb, self.n_freq, self.n_samp))
+        mask      = np.zeros((self.n_det, self.n_sb, self.n_freq))
+        mask_full = np.zeros((self.n_det, self.n_sb, self.n_freq_hr))
+        acc       = np.zeros((self.n_det, self.n_sb))
+        self.ampl      = np.zeros((4, self.n_det, self.n_sb, self.n_freq_hr))
+        tsys      = np.zeros((self.n_det, self.n_sb, self.n_freq))
+        chi2      = np.zeros((self.n_det, self.n_sb, self.n_freq))
+        sd        = np.zeros((3, self.n_det, self.n_sb, 4, 1000))
+        sb_mean   = np.zeros((self.n_det, self.n_sb, self.n_samp))
+        reason    = np.zeros((self.n_det, self.n_sb, self.n_freq_hr))
         # print(ampl_ind.shape)
         # print(ampl[:, pixels, :, :].shape)
 
@@ -218,19 +248,21 @@ class L2plots():
         mask_full[pixels] = mask_full_ind
         reason[pixels]    = reason_ind
         acc[pixels]       = acc_ind
-        ampl[:, pixels, :, :]  = ampl_ind
+        self.ampl[:, pixels, :, :]  = ampl_ind
         tsys[pixels]           = tsys_ind
         chi2[pixels]           = chi2_ind
         sd[:, pixels, :, :, :] = sd_ind
         sb_mean[pixels]        = sb_mean_ind 
 
-        acc = acc.flatten()
-        # n_det, n_sb, n_freq, n_samp = tod.shape
+        self.mask_hr   = mask_full
+        acc       = acc.flatten()
+        self.mask_full = mask_full.reshape((self.n_det, self.n_sb, self.n_freq, 16)).sum(3)
 
         tod            = tod[:, :, :, :] * mask[:, :, :, None]
+        self.tod_hist = copy.deepcopy(tod)
         tod[:, (0, 2)] = tod[:, (0, 2), ::-1]
 
-        tod_flat = tod.reshape((n_det * n_sb * n_freq, n_samp))
+        tod_flat = tod.reshape((self.n_det * self.n_sb * self.n_freq, self.n_samp))
         corr     = np.corrcoef(tod_flat)
         
         chi2 = chi2.flatten()
@@ -238,7 +270,7 @@ class L2plots():
         tsys = tsys.flatten()
         tsys[(tsys == 0.0)] = np.nan
         
-        my_spikes = get_spike_list(sb_mean, sd, scan_id, mjd)
+        my_spikes = get_spike_list(sb_mean, sd, self.scan_id, mjd)
 
         reasonarr = np.zeros(6)
         r = reason[pixels[:-1]].flatten()
@@ -250,9 +282,479 @@ class L2plots():
         reasonarr[5] = len(np.where(np.logical_and(r>=40, r<=41))[0])
         
 
-        reasonarr /= n_det_ind * n_sb * n_freq
+        reasonarr /= self.n_det_ind * self.n_sb * self.n_freq
+
+        return corr, 1.0 / self.n_samp, self.n_det, acc, chi2, tsys, t0, my_spikes, reasonarr
+
+    def get_obsid_diagnostics(self):
+        self.corrs       = []
+        self.variances   = []
+        self.accs        = []
+        self.chi2s       = []
+        self.tsyss       = []
+        self.t0s         = []
+        self.rs          = []
+        self.my_spikes   = spike_list()
+
+        for i in range(self.n_scans):
+            self.l2name = f"{self.patch_name}_{self.scanids[i]:09}.h5"
+            try:
+                self.corr, self.var, self.n_det, self.acc, self.chi2, self.tsys, self.t0, self.spike_dat, self.reasonarr = self.get_corr()
+            except:
+                continue
+
+            self.corrs.append(self.corr)
+            self.variances.append(self.var)
+            self.accs.append(self.acc)
+            self.chi2s.append(self.chi2)
+            self.tsyss.append(self.tsys)
+            self.t0s.append(self.t0)
+            self.rs.append(self.reasonarr)
+            self.my_spikes.addlist(self.spike_dat.spikes)
+
+            print("Plotting scan diagnostics:")
+            self.plot_scan_diagnostics()
+            print("Done plotting scan diagnostics:")
+
+        self.t0     = (np.mean(np.array(self.t0s)) * 24 - 7) % 24 
+        self.tstart = np.min(np.array(self.t0s))
+        self.corrs  = np.array(self.corrs)
+        self.variances = np.array(self.variances)
+        self.reason    = np.nanmean(np.array(self.rs), 0)
+        self.weights   = 1 / self.variances[:, None, None] * (np.isfinite(self.corrs)) #(corrs != 0)
         
-        return corr, 1.0 / n_samp, n_det, acc, chi2, tsys, t0, my_spikes, reasonarr
+        self.W = np.sum(self.weights, 0)
+        
+        self.corr[(self.W > 0)] = 1 / self.W[(self.W > 0)] * np.nansum(self.corrs[:, (self.W > 0)] * self.weights[:, (self.W > 0)], 0)
+
+    def plot_scan_diagnostics(self):
+
+        if (self.feat == 16):
+            scanmode = 'circular'
+        elif (self.feat == 32):
+            scanmode = 'CES'
+        elif (self.feat == 512):
+            scanmode = 'raster'
+        elif (self.feat == 32768):
+            scanmode = 'lissajous'
+        else:
+            scanmode = ''
+        ################ corr plot 
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        # im = ax.imshow(np.log10(np.abs(corr)), vmin=-3, vmax=-1,
+        #                extent=(0.5, self.n_det + 0.5, self.n_det + 0.5, 0.5))
+        # cbar = fig.colorbar(im, ticks=[-1, -2, -3])
+        # cbar.ax.set_yticklabels(['0.1', '0.01', '0.001'])
+        vmax = 0.1
+        im = ax.imshow(self.corr, vmin=-vmax, vmax=vmax,  #vmin=-1, vmax=1,#vmin=-0.1, vmax=0.1,
+                        extent=(0.5, self.n_det + 0.5, self.n_det + 0.5, 0.5))
+        cbar = fig.colorbar(im)
+        cbar.set_label('Correlation')
+        new_tick_locations = np.array(range(self.n_det)) + 1
+        ax.set_xticks(new_tick_locations)
+        ax.set_yticks(new_tick_locations)
+        # ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det + 1), ymin=0, ymax=1, linestyle='--', color='k', lw=0.6, alpha=0.2)
+        xl = np.linspace(0.5, self.n_det + 0.5, self.n_det * 1 + 1)
+        ax.vlines(xl, ymin=0.5, ymax = self.n_det + 0.5, linestyle='-', color='k', lw=0.05, alpha=1.0)
+        ax.hlines(xl, xmin=0.5, xmax = self.n_det + 0.5, linestyle='-', color='k', lw=0.05, alpha=1.0)
+        # ax.hlines(np.linspace(0.5, self.n_det + 0.5, self.n_det * 4 + 1), xmin=0.5, xmax=n_det + 0.5, linestyle='--', color='k', lw=0.01, alpha=0.1)
+        for i in range(self.n_det):
+            plt.text(xl[i] + 0.7, xl[i] + 0.2, str(i+1), rotation=0, verticalalignment='center', fontsize=2)
+        ax.set_xlabel('Feed')
+        ax.set_ylabel('Feed')
+        ax.set_title('Scan: ' + str(self.scan_id))
+        print(self.scan_id)
+        save_string = '_%s_%07i_%02i_00_AB.png' % (self.date, int(self.scan_id[:-2]), int(self.scan_id[-2:]))
+        
+        self.ensure_dir_exists(self.outpath + 'corr_hr')
+        self.ensure_dir_exists(self.outpath + 'corr_lr')
+        
+        plt.savefig(self.outpath + 'corr_hr/' + save_string, bbox_inches='tight', dpi=800)
+        plt.savefig(self.outpath + 'corr_lr/' + save_string, bbox_inches='tight', dpi=150)
+        # plt.savefig(self.outpath + 'corr_highres' + save_string, bbox_inches='tight', dpi=800) 
+        #     plt.savefig(self.outpath + 'corr_lowres' + save_string, bbox_inches='tight', dpi=150) 
+        ################ end of corr plot 
+
+
+        fig = plt.figure(figsize=(6, 6))
+        ax = fig.add_subplot(311)#211)
+        
+        # ax.set_title('Obsid: ' + str(obsid) + ', utc - 7: %02i [h]' % round(t0))
+
+        n = len(self.acc)
+        # for j in range(n):
+        #     print(np.array(file_list[i]['freqmask_full']).flatten()[j])
+        x = np.linspace(0.5, self.n_det + 0.5, len(self.acc) + 1)
+        plotter = np.zeros((len(self.acc) + 1))
+        plotter[:-1] = self.acc
+        eff_feeds = (self.acc.sum()/4.0)
+        ax.step(x, plotter, where='post', label='Effective feeds: ' + '%.2f' % eff_feeds)##############, width=0.3)
+
+        ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det + 1), ymin=0, ymax=1, linestyle='--', color='k', lw=0.6, alpha=0.2)
+        ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det * 4 + 1), ymin=0, ymax=1, linestyle='--', color='k', lw=0.2, alpha=0.2)
+        new_tick_locations = np.array(range(self.n_det)) + 1
+        ax.set_xticks(new_tick_locations)
+        ax.set_xlim(0.5, self.n_det + 0.48)
+        ax.set_ylim(0.0, 1)
+        # ax.text(1.0, 0.81, 'Mean acceptrate' + str(self.acc.mean()), fontsize=8)
+        # ax.set_xlabel('Detector')
+        ax.set_ylabel('Acceptance rate')
+        #save_string = 'acc_chi2_%08i.pdf' % (int(obsid))
+        #plt.savefig(save_string, bbox_inches='tight')
+        plt.legend()
+        # chi2s = np.array(chi2s)
+        # self.n_samp = 1 / np.array(variances)
+        # chi2 = (np.nansum(chi2s * np.sqrt(2 * self.n_samp[:, None]), 0)) / np.sqrt(2 * np.sum(self.n_samp[:,None] * (np.isfinite(chi2s)), 0))
+        # for i in range(5):
+        #     print(i)
+        #     print(chi2[1000 * i])
+        #     print(chi2s[:,1000 * i])
+        #     print(self.n_samp)
+        #     print(np.sum(self.n_samp[:,None] * (np.isfinite(chi2s)), 0)[1000*i])
+        ax = fig.add_subplot(312)#211)
+        ymin = -5
+        ymax = 5
+        n = len(self.chi2)
+        # for j in range(n):
+        #     print(np.array(file_list[i]['freqmask_full']).flatten()[j])
+        x = np.linspace(0.5, self.n_det + 0.5, len(self.chi2))
+        plotter = np.zeros((len(self.chi2)))
+        plotter = self.chi2
+        chi2mean = np.nanmean(self.chi2)
+        #ax.step(x, plotter, where='post', label=r'Mean $\chi^2$: ' + str(np.nanmean(self.chi2)))##############, width=0.3)
+        ax.plot(x, plotter, label=r'$\langle \chi^2\rangle$: ' + '%.2f' % chi2mean)##############, width=0.3)
+
+        ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det + 1), ymin=ymin, ymax=ymax, linestyle='--', color='k', lw=0.6, alpha=0.2)
+        ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det * 4 + 1), ymin=ymin, ymax=ymax, linestyle='--', color='k', lw=0.2, alpha=0.2)
+        new_tick_locations = np.array(range(self.n_det)) + 1
+        ax.set_xticks(new_tick_locations)
+        ax.set_xlim(0.5, self.n_det + 0.48)
+        ax.set_ylim(ymin, ymax)
+        # ax.text(1.0, 0.81, 'Mean acceptrate' + str(self.acc.mean()), fontsize=8)
+        # ax.set_xlabel('Detector')
+        ax.set_ylabel(r'$\chi^2$')
+        plt.legend()
+        
+        ax = fig.add_subplot(313)  #211)
+        ymin = 20
+        ymax = 100
+        n = len(self.tsys)
+        # for j in range(n):
+        #     print(np.array(file_list[i]['freqmask_full']).flatten()[j])
+        x = np.linspace(0.5, self.n_det + 0.5, len(self.tsys) + 1)
+        plotter = np.zeros((len(self.tsys) + 1))
+        plotter[:-1] = self.tsys
+        tsysmean = np.nanmean(self.tsys)
+        #ax.step(x, plotter, where='post', label=r'Mean $T_{sys}$: ' + str(np.nanmean(self.tsys)))##############, width=0.3)
+        ax.plot(x, plotter, '.', markersize=1.5, label=r'$\langle T_{sys}\rangle$: ' + '%.2f' % tsysmean)##############, width=0.3)
+
+        ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det + 1), ymin=ymin, ymax=ymax, linestyle='--', color='k', lw=0.6, alpha=0.2)
+        ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det * 4 + 1), ymin=ymin, ymax=ymax, linestyle='--', color='k', lw=0.2, alpha=0.2)
+        new_tick_locations = np.array(range(self.n_det)) + 1
+        ax.set_xticks(new_tick_locations)
+        ax.set_xlim(0.5, self.n_det + 0.48)
+        ax.set_ylim(ymin, ymax)
+        # ax.text(1.0, 0.81, 'Mean acceptrate' + str(self.acc.mean()), fontsize=8)
+        # ax.set_xlabel('Detector')
+        ax.set_ylabel(r'$T_{sys}$')
+        plt.legend()
+        reason = self.reasonarr
+        str_id = ['fixed mask', 'NaN', 'outl. freq', 'bad sb', 'corr. struct', 'edge corrs']
+        
+        inds = np.argsort(reason)[::-1]
+        
+        figstrings = [str_id[k] + ': %.2f \n' % reason[k] for k in inds]
+        figstring = "".join(figstrings)
+
+        plt.figtext(0.92, 0.7, figstring[:-2])
+        #save_string = 'acc_chi2_%06i.png' % (int(obsid))
+        #save_string = 'acc_chi2_%07i_00.png' % (int(obsid))
+        #save_string = 'acc_chi2_%07i_00_00_AB.png' % (int(obsid))
+        save_string = 'acc_chi2_%s_%07i_%02i_00_AB.png' % (self.date, int(self.scan_id[:-2]), int(self.scan_id[-2:]))
+        ############## plt.savefig(self.outpath + 'acc_chi2/' + save_string, bbox_inches='tight')
+        
+        self.ensure_dir_exists(self.outpath + 'acc_chi2')
+        
+        plt.savefig(self.outpath + 'acc_chi2/' + save_string, bbox_inches='tight')
+        
+        dt = (self.time[1] - self.time[0]) * 60  # seconds
+        radiometer = 1 / np.sqrt(31.25 * 10 ** 6 * dt)  # * 1.03
+        a = np.abs(self.ampl).mean((1, 2, 3))
+        a2 = np.abs(self.ampl ** 2).mean((1, 2, 3))
+        fig = plt.figure(figsize=(6, 12))
+        # ax = fig.add_subplot(611)
+        # radiometer *= 40
+        for i in range(3):
+            subplot = str(611 + 2 * i)
+            # i = i + 3
+            var_exp = a2[i] * (self.pca[i]).std() ** 2 / radiometer ** 2 
+            ax2 = fig.add_subplot(subplot)
+            print("hi", self.time.shape, self.pca.shape)
+            ax2.plot(self.time, self.pca[i], label=str(self.scan_id) + ", PCA comp. " + str(i+1))   # , label='PCA common mode')
+            ax2.legend()
+            ax2.set_xlim(0, self.time[-1])
+            ax2.set_xlabel('time [m]')
+            # i = i - 3
+            subplot = str(611 + 2 * i + 1)
+            # i = i + 3
+            ax = fig.add_subplot(subplot)
+            #my_file = h5py.File(filename, mode="r")
+            acc = self.ampl[i].flatten() #np.array(my_file['pca_ampl'][i]).flatten()
+            n = len(acc)
+            # print(n)
+            n_dec1 = 16
+            print(acc.shape, n, n // n_dec1, n_dec1)
+            acc = np.abs(acc.reshape((n // n_dec1, n_dec1)).mean(1))
+            n_dec2 = 64
+            acc = np.abs(acc.reshape((n // (n_dec1 * n_dec2), n_dec2))).mean(1)
+            # acc = self.self.acc.reshape((n // n_dec, n_dec)).mean(1)
+            n = len(acc)
+            # print(n)subplot
+            acc = 100 * np.sqrt(acc ** 2 * (self.pca[i]).std() ** 2 / radiometer ** 2)
+            # print(acc)
+            # for j in range(n):
+            #     print(np.array(file_list[i]['freqmask_full']).flatten()[j])
+            x = np.linspace(0.5, self.n_det + 0.5, len(acc) + 1)
+            plotter = np.zeros((len(acc) + 1))
+            plotter[:-1] = acc
+            ax.step(x, plotter, label='Avg std explained: %.1f %%' % (acc.mean()), where='post')
+            # x = np.linspace(0.5, self.n_det + 0.5, len(self.acc))
+            # ax.plot(x, acc, label="co2_" + str(scanid) + "_0" + str(i+1))#, width=0.3)
+
+            ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det + 1), ymin=-1, ymax=100, linestyle='--', color='k', lw=0.6, alpha=0.2)
+            ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det * 4 + 1), ymin=-1, ymax=100, linestyle='--', color='k', lw=0.2, alpha=0.2)
+            new_tick_locations = np.array(range(self.n_det)) + 1
+            ax.set_xticks(new_tick_locations)
+            ax.set_xlim(0.5, self.n_det + 0.48)
+            # ax.set_ylim(-0.05, 0.05)
+            ax.set_ylim(0, 60)
+            ax.set_xlabel('Feed')
+            ax.set_ylabel(r'% of $1 / \sqrt{B\tau}$')
+            ax.legend(loc=1)
+            # i = i - 3
+        save_string = 'pca_ampl_time_%s_%07i_%02i_00_AB.png' % (self.date, int(self.scan_id[:-2]), int(self.scan_id[-2:]))
+        ############## plt.savefig(self.outpath + 'acc_chi2/' + save_string, bbox_inches='tight')
+        
+        self.ensure_dir_exists(self.outpath + 'pca_ampl')
+        
+        
+        plt.savefig(self.outpath + "pca_ampl/" + save_string, bbox_inches='tight')
+        
+
+        ampl2 = self.ampl[:] / self.mask_hr[None, :]
+        # a = ampl[0, 0, :, :]
+        self.ampl[:, :, (0, 2)] = self.ampl[:, :, (0, 2), ::-1]
+        ampl2[:, :, (0, 2)] = ampl2[:, :, (0, 2), ::-1]
+        # ax = fig.add_subplot(611)
+        # radiometer *= 40
+        #maxval = np.max(np.abs(ampl[0].flatten()))#np.nanstd(np.abs(ampl[0].flatten())) * 2
+
+        for j in range(len(self.ampl[:, 0, 0, 0])):
+            fig = plt.figure(figsize=(12, 10))
+            #fig, axes = plt.subplots(21, 2, figsize=(10, 15), gridspec_kw={'width_ratios': [3, 2]})
+            gs = fig.add_gridspec(22, 2, width_ratios=[3, 2])
+            print("hello", self.eigv.shape)
+            fig.suptitle('PCA, %s %s scan: ' % (self.patch_name, scanmode) + self.scan_id + ', mode:' + str(j+1) + ', eigv.: %.2f' % (self.eigv[j]) 
+                        + ', windspeed: %.2f m/s' % (self.windspeed), fontsize=12)
+            fig.subplots_adjust(top=0.915)
+            maxval = 0.15 #max(np.nanstd(np.abs(ampl[j][ampl[j] != 0].flatten())) * 15, 0.01)
+            ax3 = fig.add_subplot(gs[:2, :])
+            ax3.plot(self.time, self.pca[j]) #, label=str(self.scan_id) + ", PCA comp. " + str(j+1))   # , label='PCA common mode')
+            #ax.legend()
+            ax3.set_ylabel('pca mode')
+            ax3.set_xlim(0, self.time[-1])
+            ax3.set_xlabel('time [m]')
+            ax3.set_yticklabels(())
+            ax3.set_yticks(())
+            ax3.yaxis.set_minor_formatter(mticker.NullFormatter())
+            ax3.xaxis.tick_top()
+            ax3.xaxis.set_label_position('top') 
+            for i in range(20):
+                # ax = axes[i+1][0]
+                # ax2 = axes[i+1][1]
+                ax = fig.add_subplot(gs[i+2, 0])
+                ax2 = fig.add_subplot(gs[i+2, 1])
+                #ax = fig.add_subplot(20, 2, 1 + 2 * i)
+                nu = np.linspace(26, 34, 4096 + 1)[:-1]
+                dnu = nu[1] - nu[0]
+                nu = nu + dnu / 2
+                a = self.ampl[j, i, :, :].flatten()
+                am = ampl2[j, i, :, :].flatten()
+                ax.plot(nu, am)
+                ax.yaxis.set_label_position("right")
+                h = ax.set_ylabel(str(i+1))
+                
+                ax.set_ylim(-maxval, maxval)
+                ax.set_xlim(26, 34)
+                ax.set_xlabel('Frequency [GHz]')
+                #h.set_rotation(0)
+
+                
+
+                if i < 19:
+                    ax.set_xticklabels(())
+                    ax2.set_xticklabels(())
+                # if i == 0:
+                #     ax.set_title('PCA ampl., scan: ' + self.scan_id + ', mode:' + str(j+1) + ', eigv.:' + str(eigv[j]) + ', windspeed: ' + str(windspeed), fontsize=12)
+                
+                f = np.abs(fft.rfftfreq(len(a), dnu * 1e3))[1:]
+                #print(f)
+                #print(a)
+                ps = (np.abs(fft.rfft(a)) ** 2 / len(a))[1:]
+                #print(ps)
+                ax2.plot(f, ps)
+
+                ax2.set_xscale('log')
+                ax2.set_yscale('log')
+
+                ax2.set_xlim(2e-3, 2e-2)
+                ax2.set_ylim(1e-7, 1e0)
+                if i == 19:
+                    ax2.set_xlabel('[1/MHz]')
+                if i < 19:
+                    ax2.set_xticks(())
+
+                ax2.xaxis.set_minor_formatter(mticker.NullFormatter())
+
+            save_string = 'pca_%02i_%s_%07i_%02i_00_AB.png' % (j + 1, self.date, int(self.scan_id[:-2]), int(self.scan_id[-2:]))
+            ############## plt.savefig(self.outpath + 'acc_chi2/' + save_string, bbox_inches='tight')
+
+            self.ensure_dir_exists(self.outpath + 'pca_comp')
+
+
+            plt.savefig(self.outpath + "pca_comp/" + save_string, bbox_inches='tight')
+
+
+        # print(self.tsys)
+        # for i in range(19): ###########################
+        tsys  =self.tsys.reshape(self.n_det, self.n_sb, self.n_freq)
+        tsys[np.where(tsys == 0.0)] = np.inf
+        # tsys = tsys * np.sqrt(mask_full)
+        # i = 10
+        print("hei", tsys.shape)
+        tod2 = (self.tod_hist / (tsys[:, :, :, None] * radiometer) * np.sqrt(self.mask_full[:, :, :, None] / 16)).flatten()  # tod.flatten() / radiometer#(tod / radiometer * np.sqrt(mask_full[:, :, :, None] / 16)).flatten()
+        tod2 = tod2[np.where(np.abs(tod2) > 0)]
+        tod2 = tod2[np.where(np.abs(tod2) < 20)]
+        std = np.nanstd(tod2)
+        print(std)
+
+        fig = plt.figure(figsize=(8, 4))
+        ax1 = fig.add_subplot(121)
+        x = np.linspace(-4 * std, 4 * std, 300)
+        ax1.plot(x, norm.pdf(x), 'g', lw=2, label=r'$\mathcal{N}(0, 1)$', zorder=1)
+        ax1.plot(x, norm.pdf(
+            x, scale=std), 'r', lw=2,
+            label=r'$\mathcal{N}(0, \sigma_\mathrm{samp})$',
+            zorder=2)
+        ax1.hist(tod2, bins=x, density=True, label='All samples, ', alpha=0.8, zorder=3)
+        # plt.yscale('log')
+        # ax1.legend()
+        if not np.any(np.isnan(x)) and not np.any(np.isinf(x)):
+            ax1.set_xlim(x[0], x[-1])
+
+        ax1.set_xlabel(r'$x \cdot \sqrt{B\tau}$')
+        ax1.set_ylabel(r'$p(x\cdot \sqrt{B\tau})$')
+        ax1.text(-3.95, .395, 'Scan: ' + str(self.scan_id), fontsize=10) # ', Feed: ' + str(i+1)
+
+        ax2 = fig.add_subplot(122)
+        x = np.linspace(-6 * std, 6 * std, 400)
+        ax2.plot(x, norm.pdf(x), 'g', lw=2, label=r'$\mathcal{N}(0, 1)$', zorder=1)
+        ax2.plot(x, norm.pdf(
+            x, scale=std), 'r', lw=2,
+            label=r'$\mathcal{N}(0, \sigma_\mathrm{samp})$',
+            zorder=2)
+        ax2.hist(tod2, bins=x, density=True, label='All samples, ', alpha=0.8, zorder=3)
+        ax2.set_yscale('log')
+        ax2.legend()
+
+        if not np.any(np.isnan(x)) and not np.any(np.isinf(x)):
+            ax2.set_xlim(x[0], x[-1])
+
+        ax2.set_ylim(1e-6, 1e0)
+        ax2.set_xlabel(r'$x \cdot \sqrt{B\tau}$')
+        # ax2.set_ylabel(r'$p(x\cdot \sqrt{B\tau})$')
+        # ax2.text(-3.9, .36, 'Scan: ' + str(self.scan_id), fontsize=15)
+
+        save_string = 'hist_%08i.png' % (int(self.scan_id))  # , i+1)
+
+        self.ensure_dir_exists(self.outpath + 'hist')
+
+        plt.savefig(self.outpath + "hist/" + save_string, bbox_inches='tight')
+
+
+
+        fig = plt.figure(figsize=(6, 6))
+        ax = fig.add_subplot(211)
+
+        n = len(self.acc)
+        # for j in range(n):
+        #     print(np.array(file_list[i]['freqmask_full']).flatten()[j])
+        x = np.linspace(0.5, self.n_det + 0.5, len(self.acc) + 1)
+        plotter = np.zeros((len(self.acc) + 1))
+        plotter[:-1] = self.acc  ## is this wrong???
+        ax.step(x, plotter, where='post', label='Mean acceptrate: ' + str(self.acc.mean() * 20 / 19))##############, width=0.3)
+
+        ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det + 1), ymin=0, ymax=1, linestyle='--', color='k', lw=0.6, alpha=0.2)
+        ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det * 4 + 1), ymin=0, ymax=1, linestyle='--', color='k', lw=0.2, alpha=0.2)
+        new_tick_locations = np.array(range(self.n_det)) + 1
+        ax.set_xticks(new_tick_locations)
+        ax.set_xlim(0.5, self.n_det + 0.48)
+        ax.set_ylim(0.75, 1)
+        # ax.text(1.0, 0.81, 'Mean acceptrate' + str(self.acc.mean()), fontsize=8)
+        # ax.set_xlabel('Detector')
+        ax.set_ylabel('Acceptance rate')
+        ax.legend(loc=3)
+        # save_string = 'acc_%08i.pdf' % (int(self.scan_id))
+        # plt.savefig(save_string, bbox_inches='tight')
+
+
+        tod = self.tod_hist[:, :, :, :]
+        tod = tod * np.sqrt(self.mask_full[:, :, :, None] / 16)
+        # tod[:, (0, 2)] = tod[:, (0, 2), ::-1]
+
+        std = tod.std(3)   ##########################################3
+        std[np.where(std != 0)] = std[np.where(std != 0)] / tsys[np.where(std != 0)]
+        mask = np.zeros_like(std)
+        mask[np.where(std != 0)] = 1.0
+        mask = mask.reshape(self.n_det, self.n_sb, self.n_freq)
+
+        mean_std = std.sum(2)
+        # print(mean_std)
+        mean_std[np.where(mean_std > 0)] = mean_std[np.where(mean_std > 0)] / mask.sum(2)[np.where(mean_std > 0)]
+        mean_std = mean_std.flatten()
+        mean_std[np.where(mean_std == 0)] = 1e3
+        x = np.linspace(0.5, self.n_det + 0.5, len(mean_std) + 1)
+        # fig = plt.figure(figsize=(5, 2))
+        ax = fig.add_subplot(212)
+        plotter = np.zeros((len(mean_std) + 1))
+        # print(plotter.shape)
+        plotter[:-1] = mean_std
+        ax.step(x, plotter / radiometer, where='post', label=str(self.scan_id))
+        # ax.step(x, 0*x + 1)
+        new_tick_locations = np.array(range(self.n_det)) + 1
+        ax.set_xticks(new_tick_locations)
+        ax.set_xlim(0.5, self.n_det + 0.5)
+        # ax.xaxis.grid((0.5, self.n_det + 0.5, 20))
+        # print(np.linspace(0.5, self.n_det + 0.5, 20))
+        ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det + 1), ymin=1, ymax=2, linestyle='--', color='k', lw=0.6, alpha=0.2)
+        ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det * self.n_sb + 1), ymin=1, ymax=2, linestyle='--', color='k', lw=0.2, alpha=0.2)
+        # ax.axvline(x[5], ymin=0, ymax=2, color='k', lw=6)
+        for i in range(len(mean_std)):
+            if mean_std[i] == 1e3:
+                ax.axvspan(x[i], x[i + 1], alpha=1, color='k', zorder=5)
+        # plt.grid()
+        ax.set_ylim(1, 1.4)
+        ax.set_xlim(0.5, self.n_det + 0.48)
+        ax.legend(loc=0)
+        # ax.set_xlabel('Feed')
+        ax.set_ylabel(r'$\langle\sigma_\mathrm{TOD}\rangle \cdot \sqrt{B\tau}$')
+        save_string = 'acc_var_%08i.png' % (int(self.scan_id))
+
+        self.ensure_dir_exists(self.outpath + 'acc_var')
+
+        plt.savefig(self.outpath + "acc_var/" + save_string, bbox_inches='tight')
+
 
     def plot_ps_chi_data(self):
         ps_chi2 = self.ps_chi2 
@@ -282,11 +784,11 @@ class L2plots():
         spec5 = fig5.add_gridspec(ncols=n_cols, nrows=n_rows, width_ratios=widths,
                                 height_ratios=heights)
         vmax = 10
-        n_det = 20
+        self.n_det = 20
         row = 0
         ax1 = fig5.add_subplot(spec5[row, 0])
-        im = ax1.imshow(ps_chi2[0], interpolation = 'none', aspect = 'auto', vmin=-vmax, vmax=vmax, extent=(0.5, 4.5, n_det + 0.5, 0.5))
-        new_tick_locations = np.array(range(n_det))+1
+        im = ax1.imshow(ps_chi2[0], interpolation = 'none', aspect = 'auto', vmin=-vmax, vmax=vmax, extent=(0.5, 4.5, self.n_det + 0.5, 0.5))
+        new_tick_locations = np.array(range(self.n_det))+1
         ax1.set_yticks(new_tick_locations)
         x_tick_loc = [1, 2, 3, 4]
         x_tick_labels = ['LA', 'UA', 'LB', 'UB']
@@ -303,8 +805,8 @@ class L2plots():
         cbar.set_label('ps_chi2')
 
         ax2 = fig5.add_subplot(spec5[row, 1], sharey=ax1)
-        ax2.imshow(ps_s_feed[0, :], interpolation = 'none', aspect = 'auto', vmin=-vmax, vmax=vmax, extent=(0.5, 1.5, n_det + 0.5, 0.5))
-        new_tick_locations = np.array(range(n_det))+1
+        ax2.imshow(ps_s_feed[0, :], interpolation = 'none', aspect = 'auto', vmin=-vmax, vmax=vmax, extent=(0.5, 1.5, self.n_det + 0.5, 0.5))
+        new_tick_locations = np.array(range(self.n_det))+1
         ax2.set_yticks(new_tick_locations)
         x_tick_loc = []
         ax2.set_xticks(x_tick_loc)
@@ -323,8 +825,8 @@ class L2plots():
         for scan in range(1, self.n_scans):
             row = 0
             ax3 = fig5.add_subplot(spec5[row, 2 * scan], sharey=ax1)
-            ax3.imshow(ps_chi2[scan], interpolation = 'none', aspect = 'auto', vmin=-vmax, vmax=vmax, extent=(0.5, 4.5, n_det + 0.5, 0.5))
-            new_tick_locations = np.array(range(n_det))+1
+            ax3.imshow(ps_chi2[scan], interpolation = 'none', aspect = 'auto', vmin=-vmax, vmax=vmax, extent=(0.5, 4.5, self.n_det + 0.5, 0.5))
+            new_tick_locations = np.array(range(self.n_det))+1
             ax3.set_yticks(new_tick_locations)
             #ax3.title.set_text(str(self.scanids[scan]), rotation = 45)
             ax3.set_title(str(self.scanids[scan]), rotation = 45)
@@ -334,8 +836,8 @@ class L2plots():
             # ax1.set_xticklabels(x_tick_labels, rotation=90)
             plt.setp(ax3.get_yticklabels(), visible=False)
             ax4 = fig5.add_subplot(spec5[row, 2 * scan+1], sharey=ax1)
-            ax4.imshow(ps_s_feed[scan], interpolation = 'none', aspect = 'auto', vmin=-vmax, vmax=vmax, extent=(0.5, 1.5, n_det + 0.5, 0.5))
-            new_tick_locations = np.array(range(n_det))+1
+            ax4.imshow(ps_s_feed[scan], interpolation = 'none', aspect = 'auto', vmin=-vmax, vmax=vmax, extent=(0.5, 1.5, self.n_det + 0.5, 0.5))
+            new_tick_locations = np.array(range(self.n_det))+1
             ax4.set_yticks(new_tick_locations)
             x_tick_loc = []
             ax4.set_xticks(x_tick_loc)
@@ -353,8 +855,8 @@ class L2plots():
         ax6 = fig5.add_subplot(spec5[row, :])
         ax6.title.set_text('Data from full obsid:')
         # print(ps_o_sb.T)
-        im = ax6.imshow(ps_o_sb.T, interpolation = 'none', aspect = 'auto', vmin=-vmax, vmax=vmax, extent=(0.5, n_det + 0.5, 4.5, 0.5))
-        new_tick_locations = np.array(range(n_det))+1
+        im = ax6.imshow(ps_o_sb.T, interpolation = 'none', aspect = 'auto', vmin=-vmax, vmax=vmax, extent=(0.5, self.n_det + 0.5, 4.5, 0.5))
+        new_tick_locations = np.array(range(self.n_det))+1
         ax6.set_xticks(new_tick_locations)
         y_tick_loc = [1, 2, 3, 4]
         y_tick_labels = ['LA', 'UA', 'LB', 'UB']
@@ -363,8 +865,8 @@ class L2plots():
         # ax1.title.set_text(str(self.scanids[0]))
         row = 3 
         ax7 = fig5.add_subplot(spec5[row, :])
-        im = ax7.imshow(ps_o_feed.T, interpolation = 'none', aspect = 'auto', vmin=-vmax, vmax=vmax, extent=(0.5, n_det + 0.5, 1.5, 0.5))
-        new_tick_locations = np.array(range(n_det))+1
+        im = ax7.imshow(ps_o_feed.T, interpolation = 'none', aspect = 'auto', vmin=-vmax, vmax=vmax, extent=(0.5, self.n_det + 0.5, 1.5, 0.5))
+        new_tick_locations = np.array(range(self.n_det))+1
         ax7.set_xticks(new_tick_locations)
         ax7.set_xticklabels([])
         y_tick_loc = []
@@ -379,10 +881,203 @@ class L2plots():
         ax8.set_yticks([])
         #plt.imshow(ps_chi2[0], interpolation='none')
         # plt.tight_layout()
-        outname = f"ps_chi_plot_{str(self.scanids[0])[:-2]}.png"
-        plt.savefig(self.outpath + outname, bbox_inches = 'tight', dpi=100)
+        outname = f"ps_chi2_{str(self.scanids[0])[:-2]}.png"
+
+        self.ensure_dir_exists(self.outpath + 'ps_chi2')
+
+        plt.savefig(self.outpath + "ps_chi2/" + outname, bbox_inches = 'tight', dpi=100)
         #plt.show()
         
+    def plot_obsid_diagnostics(self):
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+
+        vmax = 0.05
+        im = ax.imshow(self.corr, vmin = -vmax, vmax = vmax,
+                        extent = (0.5, self.n_det + 0.5, self.n_det + 0.5, 0.5))
+        cbar = fig.colorbar(im)
+        cbar.set_label('Correlation')
+        new_tick_locations = np.array(range(self.n_det)) + 1
+        ax.set_xticks(new_tick_locations)
+        ax.set_yticks(new_tick_locations)
+        
+        # ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det + 1), ymin=0, ymax=1, linestyle='--', color='k', lw=0.6, alpha=0.2)
+        
+        xl = np.linspace(0.5, self.n_det + 0.5, self.n_det * 1 + 1)
+        ax.vlines(xl, ymin = 0.5, ymax = self.n_det + 0.5, linestyle='-', color='k', lw=0.05, alpha=1.0)
+        ax.hlines(xl, xmin = 0.5, xmax = self.n_det + 0.5, linestyle='-', color='k', lw=0.05, alpha=1.0)
+        
+        # ax.hlines(np.linspace(0.5, self.n_det + 0.5, self.n_det * 4 + 1), xmin=0.5, xmax=n_det + 0.5, linestyle='--', color='k', lw=0.01, alpha=0.1)
+        
+        for j in range(self.n_det):
+            plt.text(xl[j] + 0.7, xl[j] + 0.2, str(j+1), rotation=0, verticalalignment='center', fontsize=2)
+        
+        ax.set_xlabel('Feed')
+        ax.set_ylabel('Feed')
+        ax.set_title('Obsid: ' + str(self.obsid))
+
+        save_string = '_%06i.png' % (int(self.obsid))
+        
+        self.ensure_dir_exists(self.outpath + 'corr_hr')
+        self.ensure_dir_exists(self.outpath + 'corr_lr')
+        
+        plt.savefig(self.outpath + 'corr_hr/' + 'corr_highres' + save_string, bbox_inches='tight', dpi=800) 
+        plt.savefig(self.outpath + 'corr_lr/' + 'corr_lowres' + save_string, bbox_inches='tight', dpi=150) 
+        
+        acc = np.mean(np.array(self.accs), 0)
+        fig = plt.figure(figsize = (6, 6))
+        ax = fig.add_subplot(311)#211)
+        
+        ax.set_title('Obsid: ' + str(self.obsid) + ', utc - 7: %02i [h]' % round(self.t0))
+
+        n = len(self.acc)
+
+        x = np.linspace(0.5, self.n_det + 0.5, len(self.acc) + 1)
+        plotter = np.zeros((len(self.acc) + 1))
+        plotter[:-1] = self.acc
+        eff_feeds = (self.acc.sum()/4.0)
+        ax.step(x, plotter, where='post', label='Effective feeds: ' + '%.2f' % eff_feeds)##############, width=0.3)
+
+        ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det + 1), ymin=0, ymax=1, linestyle='--', color='k', lw=0.6, alpha=0.2)
+        ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det * 4 + 1), ymin=0, ymax=1, linestyle='--', color='k', lw=0.2, alpha=0.2)
+        new_tick_locations = np.array(range(self.n_det)) + 1
+        ax.set_xticks(new_tick_locations)
+        ax.set_xlim(0.5, self.n_det + 0.48)
+        ax.set_ylim(0.0, 1)
+        # ax.text(1.0, 0.81, 'Mean acceptrate' + str(self.acc.mean()), fontsize=8)
+        # ax.set_xlabel('Detector')
+        ax.set_ylabel('Acceptance rate')
+        #save_string = 'acc_chi2_%08i.pdf' % (int(obsid))
+        #plt.savefig(save_string, bbox_inches='tight')
+        plt.legend()
+        chi2s = np.array(self.chi2s)
+        n_samp = 1 / np.array(self.variances)
+        chi2 = (np.nansum(self.chi2s * np.sqrt(2 * n_samp[:, None]), 0)) / np.sqrt(2 * np.sum(n_samp[:, None] * (np.isfinite(self.chi2s)), 0))
+    
+        ax = fig.add_subplot(312)#211)
+        ymin = -5
+        ymax = 5
+        n = len(chi2)
+
+        x = np.linspace(0.5, self.n_det + 0.5, len(chi2))
+        plotter = np.zeros((len(chi2)))
+        plotter = chi2
+        chi2mean = np.nanmean(chi2)
+        #ax.step(x, plotter, where='post', label=r'Mean $\chi^2$: ' + str(np.nanmean(chi2)))##############, width=0.3)
+        ax.plot(x, plotter, label=r'$\langle \chi^2\rangle$: ' + '%.2f' % chi2mean)##############, width=0.3)
+
+        ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det + 1), ymin = ymin, ymax = ymax, linestyle = '--', color = 'k', lw = 0.6, alpha = 0.2)
+        ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det * 4 + 1), ymin = ymin, ymax = ymax, linestyle = '--', color = 'k', lw = 0.2, alpha = 0.2)
+        new_tick_locations = np.array(range(self.n_det)) + 1
+        ax.set_xticks(new_tick_locations)
+        ax.set_xlim(0.5, self.n_det + 0.48)
+        ax.set_ylim(ymin, ymax)
+
+        ax.set_ylabel(r'$\chi^2$')
+        plt.legend()
+        tsys = np.nanmean(np.array(self.tsyss), 0)
+        ax = fig.add_subplot(313)#211)
+        ymin = 20
+        ymax = 100
+        n = len(tsys)
+        # for j in range(n):
+        #     print(np.array(file_list[i]['freqmask_full']).flatten()[j])
+        x = np.linspace(0.5, self.n_det + 0.5, len(tsys) + 1)
+        plotter = np.zeros((len(tsys) + 1))
+        plotter[:-1] = tsys
+        tsysmean = np.nanmean(tsys)
+        #ax.step(x, plotter, where='post', label=r'Mean $T_{sys}$: ' + str(np.nanmean(tsys)))##############, width=0.3)
+        ax.plot(x, plotter, '.', markersize = 1.5, label = r'$\langle T_{sys}\rangle$: ' + '%.2f' % tsysmean)##############, width=0.3)
+
+        ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det + 1), ymin = ymin, ymax = ymax, linestyle = '--', color = 'k', lw = 0.6, alpha = 0.2)
+        ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det * 4 + 1), ymin = ymin, ymax = ymax, linestyle = '--', color = 'k', lw = 0.2, alpha = 0.2)
+        new_tick_locations = np.array(range(self.n_det)) + 1
+        ax.set_xticks(new_tick_locations)
+        ax.set_xlim(0.5, self.n_det + 0.48)
+        ax.set_ylim(ymin, ymax)
+        # ax.text(1.0, 0.81, 'Mean acceptrate' + str(self.acc.mean()), fontsize=8)
+        # ax.set_xlabel('Detector')
+        ax.set_ylabel(r'$T_{sys}$')
+        plt.legend()
+
+        str_id = ['fixed mask', 'NaN', 'outl. freq', 'bad sb', 'corr. struct', 'edge corrs']
+        
+        inds = np.argsort(self.reason)[::-1]
+        
+        figstrings = [str_id[k] + ': %.2f \n' % self.reason[k] for k in inds]
+        figstring = "".join(figstrings)
+
+        plt.figtext(0.92, 0.7, figstring[:-2])
+        save_string = 'acc_chi2_%06i.pdf' % (int(self.obsid))
+
+        self.ensure_dir_exists(self.outpath + 'acc_chi2')
+
+        plt.savefig(self.outpath + 'acc_chi2/' + save_string, bbox_inches='tight')
+        
+
+        sortedlists = self.my_spikes.sorted()
+        n_spikes = len(sortedlists[0])
+        n_jumps = len(sortedlists[1])
+        n_anom = len(sortedlists[2]) 
+
+        n_spike_types = 3
+        n_plots = 3
+        fig = plt.figure(figsize=(12, 10))
+        fig.suptitle('Obsid: %06i, %i spikes, %i jumps and %i anomalies. Top: 3 largest spikes.\
+        Middle: 3 largest jumps. Bottom: 3 largest anomalies' % (
+        int(self.obsid), n_spikes, n_jumps, n_anom))
+        #fig.suptitle('Top: 3 largest spikes. Middle: 3 largest jumps. Bottom: 3 largest anomalies')
+        for i in range(n_spike_types):
+            for j in range(n_plots):
+                try:
+                    spike = sortedlists[i][j]
+                    ax = fig.add_subplot(n_spike_types, n_plots, n_plots * i + j + 1)
+                    ind = spike.ind
+                    lab = 'Feed %i, sb %i, Ampl: %.3f' % (ind[0] + 1, ind[1] + 1, spike.amp)
+                    dt = 0.02  # sampling rate
+                    mjd = (spike.mjd - self.tstart) * 24 * 3600
+                    time = np.linspace(mjd - 200 * dt, mjd + 199 * dt, len(spike.data))
+                    ax.plot(time, spike.data, label = lab)#sb_mean[max_sb[0], max_sb[1], max_ind - 200:max_ind + 200])
+                    ax.set_xlabel('time [s]')
+                    plt.legend()
+                    if j == 0:
+                        ax.set_ylabel('sb avg tod')
+                except IndexError:
+                    ax = fig.add_subplot(n_spike_types, n_plots, n_plots * i + j + 1)
+                    pass
+        save_string = 'spikes_%06i.pdf' % (int(self.obsid))  # , i+1)
+
+        self.ensure_dir_exists(self.outpath + 'spikes')
+
+        plt.savefig(self.outpath + 'spikes/' + save_string, bbox_inches='tight')
+        
+
+        plt.close('all')
+        
+
+        #statsdir = '/mn/stornext/d16/cmbco/comap/protodir/auxiliary/l2stats/'
+        statsdir = self.outpath + 'l2stats/'
+
+        self.ensure_dir_exists(statsdir)
+
+        fields = ['co2', 'co6', 'co7']
+        stats = np.zeros(50)
+        stats[0] = int(self.obsid)
+        stats[1] = self.n_scans
+        stats[2] = fields.index(self.patch_name)
+        stats[3] = 0.0  # Scanning strategy 
+        stats[4] = self.tstart
+        stats[5] = eff_feeds
+        stats[6] = chi2mean
+        stats[7] = tsysmean
+        stats[8] = n_spikes
+        stats[9] = n_jumps
+        stats[10] = n_anom
+        
+        save_string = 'l2_stats_%06i.txt' % (int(self.obsid))
+        np.savetxt(statsdir + save_string, stats)
+
 
 if __name__ == "__main__":
     l2plotter = L2plots()
