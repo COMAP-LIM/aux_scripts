@@ -10,79 +10,80 @@ import ctypes
 import argparse
 
 class Atlas:
-    def __init__(self, terminal_mode = True, save_outmap = True, infile1 = None, infile2 = None, outfile = None, spl = None, split = None, 
+    def __init__(self, terminal_mode = True, save_outmap = True, no_init = False, infile1 = None, infile2 = None, outfile = None, spl = None, split = None, 
                 det_list = range(1,20), sb_list = range(1,5), freq_list = range(1,65), beam = False, full = False,
                 coadd = False, add = False, subtract = False, dgrade_list = None, ugrade_list = None, smooth_list = None, n_sigma = 5):
         """
         Initiating Atlas class and setting class attributes and default command line arguments
         """
-        self.save_outmap = save_outmap
+        if not no_init:
+            self.save_outmap = save_outmap
 
-        self.add = add
-        self.subtract = subtract
-        self.coadd = coadd 
-        self.dgrade_list = dgrade_list
-        self.ugrade_list = ugrade_list
-        self.smooth_list = smooth_list
-        self.n_sigma      = n_sigma                 # Default n_sigma; used for defining the Gaussian smoothing kernel's grid.
-        
-        self.det_list = det_list
-        self.sb_list  = sb_list
-        self.freq_list = freq_list 
+            self.add = add
+            self.subtract = subtract
+            self.coadd = coadd 
+            self.dgrade_list = dgrade_list
+            self.ugrade_list = ugrade_list
+            self.smooth_list = smooth_list
+            self.n_sigma      = n_sigma                 # Default n_sigma; used for defining the Gaussian smoothing kernel's grid.
+            
+            self.det_list = det_list
+            self.sb_list  = sb_list
+            self.freq_list = freq_list 
 
-        self.spl_choices   = ["odde", "dayn", "half", "sdlb", "sidr"]    # Possible choices of split modes.
-        self.spl           = spl                                          # If no split argument is given self.spl will be None.
-        self.split         = split                                        # If ture operations are performed on splits, changes to 
-                                                                        #true if split command line input is given.
+            self.spl_choices   = ["odde", "dayn", "half", "sdlb", "sidr"]    # Possible choices of split modes.
+            self.spl           = spl                                          # If no split argument is given self.spl will be None.
+            self.split         = split                                        # If ture operations are performed on splits, changes to 
+                                                                            #true if split command line input is given.
 
-        self.tool_choices   = ["coadd", "subtract", "add", "dgradeXY", "dgradeZ", "dgradeXYZ",
-                                                           "ugradeXY", "ugradeZ", "ugradeXYZ",
-                                                           "smoothXY", "smoothZ", "smoothXYZ"]     # Tool choices.
-        self.tool         = None                    # Default tool is coadd.
-        self.det_list     = np.arange(1,20)         # List of detectors to use, default all.
-        self.sb_list      = np.arange(1,5)          # List of sidebands to use, default all.
-        self.freq_list    = np.arange(1,65)         # List of frequency channels per sideband, default all.
-        self.outfile      = outfile                 # Output file name.
+            self.tool_choices   = ["coadd", "subtract", "add", "dgradeXY", "dgradeZ", "dgradeXYZ",
+                                                            "ugradeXY", "ugradeZ", "ugradeXYZ",
+                                                            "smoothXY", "smoothZ", "smoothXYZ"]     # Tool choices.
+            self.tool         = None                    # Default tool is coadd.
+            self.det_list     = np.arange(1,20)         # List of detectors to use, default all.
+            self.sb_list      = np.arange(1,5)          # List of sidebands to use, default all.
+            self.freq_list    = np.arange(1,65)         # List of frequency channels per sideband, default all.
+            self.outfile      = outfile                 # Output file name.
 
-        self.beam        = beam    # If true subsequent operations are only performed on _beam dataset.
-        self.full        = full    # If true subsequent operations are only performed on full dataset.
-        self.everything  = False    # If true full, beam and splitknive datasets are all processed.
-        self.patch1       = ''      # Patch name of first infile.
-        self.patch2       = ''      # Patch name of second infile.
-        self.infile1      = infile1    # Fist infile name.
-        self.infile2      = infile2    # Second infile name.
-        self.maputilslib = ctypes.cdll.LoadLibrary("/mn/stornext/d16/cmbco/comap/protodir/auxiliary/maputilslib.so.1")  # Load shared C utils library.
-        #self.maputilslib = ctypes.cdll.LoadLibrary("maputilslib.so.1")  # Load shared C utils library.
+            self.beam        = beam    # If true subsequent operations are only performed on _beam dataset.
+            self.full        = full    # If true subsequent operations are only performed on full dataset.
+            self.everything  = False    # If true full, beam and splitknive datasets are all processed.
+            self.patch1       = ''      # Patch name of first infile.
+            self.patch2       = ''      # Patch name of second infile.
+            self.infile1      = infile1    # Fist infile name.
+            self.infile2      = infile2    # Second infile name.
+            self.maputilslib = ctypes.cdll.LoadLibrary("/mn/stornext/d16/cmbco/comap/protodir/auxiliary/maputilslib.so.1")  # Load shared C utils library.
+            #self.maputilslib = ctypes.cdll.LoadLibrary("maputilslib.so.1")  # Load shared C utils library.
 
-        if terminal_mode:
-            self.input()    # Calling the input function to set variables dependent on command line input.
+            if terminal_mode:
+                self.input()    # Calling the input function to set variables dependent on command line input.
 
-        if self.infile1 != None and self.infile2 != None:
-            """Checking whether both input files have split datasets"""
-            if self.split and ("splits" not in self.dfile1 or "splits" not in self.dfile2):
-                print("One or both of the input files does not contain any split information!")
-                sys.exit()
-
-        if not self.full and not self.beam and not self.split:
-            """Checking whether to process all datasets"""
-            self.everything = True
             if self.infile1 != None and self.infile2 != None:
-                if "splits" in self.dfile1 and "splits" in self.dfile2:
-                    nhit_lst = [i for i in self.dfile1["splits"].keys() if "nhit_" in i]
-                    self.spl =  [i.split("_")[1] for i in nhit_lst]
-            else: 
-                if "splits" in self.dfile1:
-                    nhit_lst = [i for i in self.dfile1["splits"].keys() if "nhit_" in i]
-                    self.spl =  [i.split("_")[1] for i in nhit_lst]
-        if self.save_outmap:
-            self.ofile = h5.File(self.outfile, "w")         # Opening outfile object with write access.   
+                """Checking whether both input files have split datasets"""
+                if self.split and ("splits" not in self.dfile1 or "splits" not in self.dfile2):
+                    print("One or both of the input files does not contain any split information!")
+                    sys.exit()
 
-        self.operation()                                    # Calling operations to perform operation with tool given in command line.
-        self.dfile1.close()                                 # Closing first input file.
-        if self.infile1 != None and self.infile2 != None:   
-            self.dfile2.close()                             # Closing second input file if provided.
-        if self.save_outmap:
-            self.ofile.close()                              # Closing output file.
+            if not self.full and not self.beam and not self.split:
+                """Checking whether to process all datasets"""
+                self.everything = True
+                if self.infile1 != None and self.infile2 != None:
+                    if "splits" in self.dfile1 and "splits" in self.dfile2:
+                        nhit_lst = [i for i in self.dfile1["splits"].keys() if "nhit_" in i]
+                        self.spl =  [i.split("_")[1] for i in nhit_lst]
+                else: 
+                    if "splits" in self.dfile1:
+                        nhit_lst = [i for i in self.dfile1["splits"].keys() if "nhit_" in i]
+                        self.spl =  [i.split("_")[1] for i in nhit_lst]
+            if self.save_outmap:
+                self.ofile = h5.File(self.outfile, "w")         # Opening outfile object with write access.   
+
+            self.operation()                                    # Calling operations to perform operation with tool given in command line.
+            self.dfile1.close()                                 # Closing first input file.
+            if self.infile1 != None and self.infile2 != None:   
+                self.dfile2.close()                             # Closing second input file if provided.
+            if self.save_outmap:
+                self.ofile.close()                              # Closing output file.
 
 
     def input(self):
@@ -968,7 +969,8 @@ class Atlas:
                             if len(self.map1.shape) == 5:
                                 self.C_add5D(self.map1, self.nhit1, self.rms1,
                                              self.map2, self.nhit2, self.rms2) 
-                        self.writeMap(split)
+                        if self.save_outmap:
+                            self.writeMap(split)
                 
                 self.full = True
                 self.map1, self.nhit1, self.rms1 = self.readMap(True)
@@ -984,7 +986,8 @@ class Atlas:
                 elif self.tool == "add": 
                     self.C_add5D(self.map1, self.nhit1, self.rms1,
                                  self.map2, self.nhit2, self.rms2)
-                self.writeMap()
+                if self.save_outmap:
+                    self.writeMap()
                 
                 self.full = False
                 self.beam = True
@@ -1003,7 +1006,8 @@ class Atlas:
                     self.C_add4D(self.map1, self.nhit1, self.rms1,
                                 self.map2, self.nhit2, self.rms2)  
 
-                self.writeMap()
+                if self.save_outmap:
+                    self.writeMap()
                 self.beam = False
             
             if self.split:
@@ -1037,7 +1041,8 @@ class Atlas:
                             if len(self.map1.shape) == 5:
                                 self.C_add5D(self.map1, self.nhit1, self.rms1,
                                             self.map2, self.nhit2, self.rms2) 
-                    self.writeMap(split)
+                    if self.save_outmap:
+                        self.writeMap(split)
 
             if self.full:
                 _beam = self.beam
@@ -1056,7 +1061,8 @@ class Atlas:
                     self.C_add5D(self.map1, self.nhit1, self.rms1,
                                 self.map2, self.nhit2, self.rms2)  
 
-                self.writeMap()
+                if self.save_outmap:
+                    self.writeMap()
                 self.beam = _beam
         
             if self.beam:
@@ -1076,9 +1082,11 @@ class Atlas:
                     self.C_add4D(self.map1, self.nhit1, self.rms1,
                                 self.map2, self.nhit2, self.rms2)
 
-                self.writeMap()
+                if self.save_outmap:
+                    self.writeMap()
                 self.full = _full
-            self.writeMap(write_the_rest = True)
+            if self.save_outmap:
+                self.writeMap(write_the_rest = True)
 
         if self.infile1 != None and self.infile2 == None:
             """Operations to perform on single input file"""
@@ -1136,8 +1144,9 @@ class Atlas:
                         
                         elif self.tool == "smoothXYZ":
                             self.gaussian_smoothXYZ(self.map1, self.nhit1, self.rms1)
-
-                        self.writeMap(split)
+                        
+                        if self.save_outmap:
+                            self.writeMap(split)
 
                 self.full = True
                 self.map1, self.nhit1, self.rms1 = self.readMap(True)
@@ -1169,7 +1178,9 @@ class Atlas:
                 elif self.tool == "smoothXYZ":
                     self.gaussian_smoothXYZ(self.map1, self.nhit1, self.rms1)
 
-                self.writeMap()
+                if self.save_outmap:
+
+                    self.writeMap()
                 
                 self.full = False
                 self.beam = True
@@ -1202,7 +1213,8 @@ class Atlas:
                 elif self.tool == "smoothXYZ":
                     self.gaussian_smoothXYZ(self.map1, self.nhit1, self.rms1)
 
-                self.writeMap()
+                if self.save_outmap:
+                    self.writeMap()
                 self.beam = False
 
             if self.split:
@@ -1259,7 +1271,8 @@ class Atlas:
                     elif self.tool == "smoothXYZ":
                         self.gaussian_smoothXYZ(self.map1, self.nhit1, self.rms1)
 
-                    self.writeMap(split)
+                    if self.save_outmap:
+                        self.writeMap(split)
 
             if self.full:
                 _beam = self.beam
@@ -1293,7 +1306,8 @@ class Atlas:
                 elif self.tool == "smoothXYZ":
                     self.gaussian_smoothXYZ(self.map1, self.nhit1, self.rms1)
 
-                self.writeMap()
+                if self.save_outmap:
+                    self.writeMap()
                 self.beam = _beam
         
             if self.beam:
@@ -1328,9 +1342,11 @@ class Atlas:
                 elif self.tool == "smoothXYZ":
                     self.gaussian_smoothXYZ(self.map1, self.nhit1, self.rms1)
                 
-                self.writeMap()
+                if self.save_outmap:
+                    self.writeMap()
                 self.full = _full
-            self.writeMap(write_the_rest = True)            
+            if self.save_outmap:
+               self.writeMap(write_the_rest = True)            
 
 
 
