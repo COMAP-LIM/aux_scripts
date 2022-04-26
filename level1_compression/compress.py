@@ -111,7 +111,7 @@ class Compress:
         raw_filepath = path + filename  # Filepath of old uncompressed file.
         comp_filepath = path + "comp_" + filename  # Add "comp_" to compressed filename and write it to the same folder.
         if os.path.getsize(raw_filepath) > 0:
-            command = "h5repack -f /spectrometer/tod:GZIP=3 %s %s" % (raw_filepath, comp_filepath)
+            command = "h5repack -f /spectrometer/tod:GZIP=3 -l /spectrometer/tod:CHUNK=1x4x1024x4000 %s %s" % (raw_filepath, comp_filepath)
         else:
             command = "cp %s %s" % (raw_filepath, comp_filepath)
         exitstatus = os.system(command)
