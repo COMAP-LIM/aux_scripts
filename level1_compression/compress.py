@@ -142,6 +142,8 @@ class Compress:
         if errorcode != 0:
             self.nr_errors += 1
             logging.error("FILE %s DOES NOT MATCH COMPRESSED VERSION %s!" % (raw_filepath, comp_filepath))
+        else:
+            logging.info("File %s matches %s" % (raw_filepath, comp_filepath))
 
 
 
