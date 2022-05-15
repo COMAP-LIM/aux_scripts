@@ -5,9 +5,10 @@
 echo "__Number of uncompressed and compressed files in all subdirs__"
 echo "dir  uncomp  comp  tape"
 for d in /mn/stornext/d22/cmbco/comap/protodir/level1/20*/ ; do
+    month=${d:45:7}
+
     uncomp=$(ls $d\comap-*.hd5 2> /dev/null | wc -l)
     comp=$(ls $d\comp*.hd5 2> /dev/null | wc -l)
-    tape=$(ls /mn/stornext/d16/cmbco/archive/comap/data/pathfinder/ovro/$d\comap-*.hd5 2> /dev/null | wc -l)
-    month=${d:45:7}
+    tape=$(ls /mn/stornext/d16/cmbco/archive/comap/data/pathfinder/ovro/$month/comap-*.hd5 2> /dev/null | wc -l)
     echo "$month $uncomp $comp $tape"
 done
