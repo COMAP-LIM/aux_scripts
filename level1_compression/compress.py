@@ -23,6 +23,7 @@ import logging
 import time
 import datetime
 
+RAMDISK_PATH = "/dev/shm/"
 
 class Compress:
     def __init__(self, nr_threads, path):
@@ -108,13 +109,27 @@ class Compress:
         #### Compression function for single file, which will be run by each thread. A unique file index is provided by the Pool.map func. ####
         t00 = time.time()
         filename = self.filenames[file_index]
+        comp_filename = "comp_" + filename
         raw_filepath = path + filename  # Filepath of old uncompressed file.
-        comp_filepath = path + "comp_" + filename  # Add "comp_" to compressed filename and write it to the same folder.
+        temp_filepath1 = RAMDISK_PATH + filename  # Uncompressed filepath of ram-disk (used for temporary storage while compressing).
+        temp_filepath2 = RAMDISK_PATH + comp_filename  # Compressed filepath on ram-disk.
+        comp_filepath = path + comp_filename  # Compressed filepath, back at original location.
         if os.path.getsize(raw_filepath) > 0:
-            command = "h5repack -f /spectrometer/tod:GZIP=3 -l /spectrometer/tod:CHUNK=1x4x1024x4000 %s %s" % (raw_filepath, comp_filepath)
+            # Copy original file to ram-disk:
+            command = "cp %s %s" % (raw_filepath, temp_filepath1)
+            exitstatus = os.system(command)
+            # Shuffle and compress file, writing to new file on ram-disk:
+            command = "h5repack -f /spectrometer/tod:SHUF -f /spectrometer/tod:GZIP=3 -l /spectrometer/tod:CHUNK=1x4x1024x4000 %s %s" % (temp_filepath1, temp_filepath2)
+            exitstatus += os.system(command)
+            # Delete uncompressed file from ram-disk:
+            command = "rm %s" % (temp_filepath1)
+            exitstatus += os.system(command)
+            # Move compressed file from ram-disk back to original location:
+            command = "mv %s %s" % (temp_filepath2, comp_filepath)
+            exitstatus += os.system(command)
         else:
             command = "cp %s %s" % (raw_filepath, comp_filepath)
-        exitstatus = os.system(command)
+            exitstatus = os.system(command)
         t01 = time.time()
         if exitstatus != 0:
             logging.error("h5repack ON FILE %s FINISHED WITH NON-ZERO EXIT STATUS %d." % (comp_filepath, exitstatus))
@@ -169,4 +184,4 @@ if __name__ == "__main__":
     for path in paths:
         compress = Compress(nr_threads, path)
         compress.compress()
-        compress.validate()
+        # compress.validate()
