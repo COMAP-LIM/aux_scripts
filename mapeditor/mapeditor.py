@@ -34,7 +34,7 @@ class Atlas:
         self.patch2       = ''      # Patch name of second infile.
         self.infile1      = None    # Fist infile name.
         self.infile2      = None    # Second infile name.
-        self.maputilslib = ctypes.cdll.LoadLibrary("/mn/stornext/d16/cmbco/comap/protodir/auxiliary/maputilslib.so.1")  # Load shared C utils library.
+        self.maputilslib = ctypes.cdll.LoadLibrary("/mn/stornext/d22/cmbco/comap/d16/protodir/auxiliary/maputilslib.so.1")  # Load shared C utils library.
         #self.maputilslib = ctypes.cdll.LoadLibrary("maputilslib.so.1")  # Load shared C utils library.
 
         self.input()    # Calling the input function to set variables dependent on command line input.
@@ -517,7 +517,7 @@ class Atlas:
                 condition3 = "nside" in self.ofile
                 condition4 = "freq" in self.ofile
                 condition  = condition1 and condition2 and condition3 and condition4
-
+                
                 if not condition and "dgrade" in self.tool:
                     """Reading and modify other datasets"""
                     x1, y1 = self.dfile1["x"][:], self.dfile1["y"][:]
@@ -563,6 +563,33 @@ class Atlas:
                     for i in range(freq.shape[1]):
                         freq[:, i] = first_center_freq + i * df / 2
                     
+                    """Copying over data to outfile"""
+                    self.ofile.create_dataset("x",      data = x)
+                    self.ofile.create_dataset("y",      data = y)
+                    self.ofile.create_dataset("n_x",    data = len(x))
+                    self.ofile.create_dataset("n_y",    data = len(y))
+                    self.ofile.create_dataset("nside",  data = nside)
+                    self.ofile.create_dataset("freq",   data = freq)
+
+                elif not condition and "smooth" in self.tool:
+                    """Reading and modifying other datasets"""
+                    x1, y1 = self.dfile1["x"][:], self.dfile1["y"][:]
+                    dx, dy = x1[1] - x1[0], y1[1] - y1[0]
+                    first_center_x = x1[0] - dx / 4  # Finding center of new pixels x value
+                    first_center_y = y1[0] - dy / 4  # Finding center of new pixel y value
+                    x      = np.zeros(len(x1)) 
+                    y      = np.zeros(len(y1))
+
+                    """Filling up x and y arrays with new pixel centers"""
+                    for i in range(len(x1)):
+                        x[i] = first_center_x + i * dx / 2
+                        y[i] = first_center_y + i * dy / 2
+
+                    nside  = np.array(self.dfile1["nside"])              
+                    
+                    freq1   = self.dfile1["freq"][:]
+                    freq    = freq1.copy() 
+                   
                     """Copying over data to outfile"""
                     self.ofile.create_dataset("x",      data = x)
                     self.ofile.create_dataset("y",      data = y)
@@ -732,7 +759,7 @@ class Atlas:
                 
                 if self.tool == "coadd":
                     self.C_coadd4D(self.map1, self.nhit1, self.rms1,
-                                    self.map2, self.nhit2, self.rms2)
+                                   self.map2, self.nhit2, self.rms2)
 
                 elif self.tool == "subtract": 
                     self.C_subtract4D(self.map1, self.nhit1, self.rms1,
@@ -1546,7 +1573,7 @@ class Atlas:
         self.map = np.zeros( (n0, n1, N2, n3, n4), dtype = ctypes.c_float)  # Generating arrays to fill up with coadded data.
         self.nhit = np.zeros((n0, n1, N2, n3, n4), dtype = ctypes.c_int)
         self.rms = np.zeros( (n0, n1, N2, n3, n4), dtype = ctypes.c_float)
-
+        print(map_h.dtype, nhit_h.dtype, rms_h.dtype)
         self.maputilslib.dgradeZ5D(map_h,    nhit_h,     rms_h,     # Filling self.map, self.nhit and self.rms by
                                   self.map, self.nhit,  self.rms,   # call-by-pointer to C library.
                                   n0,       n1,         n2,
@@ -2107,27 +2134,27 @@ class Atlas:
         """Computing convolution"""
         if len(map.shape) == 4:
             self.map    = signal.fftconvolve(map,   kernel[np.newaxis, np.newaxis, :, :], 
-                                            mode='same', axes = axes)
+                                            mode='same', axes = axes).astype(np.float32)
             self.nhit   = signal.fftconvolve(nhit,  kernel[np.newaxis, np.newaxis, :, :], 
-                                            mode='same', axes = axes)
+                                            mode='same', axes = axes).astype(np.int32)
             self.rms    = signal.fftconvolve(rms,   kernel[np.newaxis, np.newaxis, :, :], 
-                                            mode='same', axes = axes)
+                                            mode='same', axes = axes).astype(np.float32)
 
         elif len(map.shape) == 5:
             self.map    = signal.fftconvolve(map,  kernel[np.newaxis, np.newaxis, np.newaxis, :, :], 
-                                            mode='same', axes = axes)
+                                            mode='same', axes = axes).astype(np.float32)
             self.nhit   = signal.fftconvolve(nhit, kernel[np.newaxis, np.newaxis, np.newaxis, :, :], 
-                                            mode='same', axes = axes)
+                                            mode='same', axes = axes).astype(np.int32)
             self.rms    = signal.fftconvolve(rms,  kernel[np.newaxis, np.newaxis, np.newaxis, :, :], 
-                                            mode='same', axes = axes)
+                                            mode='same', axes = axes).astype(np.float32)
 
         elif len(map.shape) == 6:
             self.map    = signal.fftconvolve(map, kernel[np.newaxis, np.newaxis, np.newaxis, np.newaxis, :, :], 
-                                            mode='same', axes = axes)
+                                            mode='same', axes = axes).astype(np.float32)
             self.nhit   = signal.fftconvolve(nhit, kernel[np.newaxis, np.newaxis, np.newaxis, np.newaxis, :, :], 
-                                            mode='same', axes = axes)
+                                            mode='same', axes = axes).astype(np.int32)
             self.rms    = signal.fftconvolve(rms, kernel[np.newaxis, np.newaxis, np.newaxis, np.newaxis, :, :], 
-                                            mode='same', axes = axes)
+                                            mode='same', axes = axes).astype(np.float32)
 
     def gaussian_smoothZ(self, map, nhit, rms):
         """
@@ -2163,9 +2190,9 @@ class Atlas:
             self.rms    = signal.fftconvolve(rms,   kernel[:, np.newaxis, np.newaxis], 
                                             mode='same', axes = axes)
 
-            self.map = self.map.reshape(n0, n1, n2, n3)         # Reshaping back to original [..., sb, channel, ...] format
-            self.nhit = self.nhit.reshape(n0, n1, n2, n3)
-            self.rms = self.rms.reshape(n0, n1, n2, n3)
+            self.map = self.map.reshape(n0, n1, n2, n3).astype(np.float32)         # Reshaping back to original [..., sb, channel, ...] format
+            self.nhit = self.nhit.reshape(n0, n1, n2, n3).astype(np.int32)
+            self.rms = self.rms.reshape(n0, n1, n2, n3).astype(np.float32)
             
         elif len(map.shape) == 5:
             n0, n1, n2, n3, n4 = map.shape
@@ -2180,9 +2207,9 @@ class Atlas:
             self.rms    = signal.fftconvolve(rms,  kernel[np.newaxis, :, np.newaxis, np.newaxis], 
                                             mode='same', axes = axes)
 
-            self.map = self.map.reshape(n0, n1, n2, n3, n4)     # Reshaping back to original [..., sb, channel, ...] format
-            self.nhit = self.nhit.reshape(n0, n1, n2, n3, n4)
-            self.rms = self.rms.reshape(n0, n1, n2, n3, n4)
+            self.map = self.map.reshape(n0, n1, n2, n3, n4).astype(np.float32)     # Reshaping back to original [..., sb, channel, ...] format
+            self.nhit = self.nhit.reshape(n0, n1, n2, n3, n4).astype(np.int32)
+            self.rms = self.rms.reshape(n0, n1, n2, n3, n4).astype(np.float32)
             
         elif len(map.shape) == 6:
             n0, n1, n2, n3, n4, n5 = map.shape
@@ -2197,9 +2224,9 @@ class Atlas:
             self.rms    = signal.fftconvolve(rms, kernel[np.newaxis, np.newaxis, :, np.newaxis, np.newaxis], 
                                             mode='same', axes = axes)
 
-            self.map = self.map.reshape(n0, n1, n2, n3, n4, n5)     # Reshaping back to original [..., sb, channel, ...] format
-            self.nhit = self.nhit.reshape(n0, n1, n2, n3, n4, n5)
-            self.rms = self.rms.reshape(n0, n1, n2, n3, n4, n5)
+            self.map = self.map.reshape(n0, n1, n2, n3, n4, n5).astype(np.float32)     # Reshaping back to original [..., sb, channel, ...] format
+            self.nhit = self.nhit.reshape(n0, n1, n2, n3, n4, n5).astype(np.int32)
+            self.rms = self.rms.reshape(n0, n1, n2, n3, n4, n5).astype(np.float32)
 
     def gaussian_smoothXYZ(self, map, nhit, rms):
         """
@@ -2230,11 +2257,11 @@ class Atlas:
             rms = rms.reshape(n0 * n1, n2, n3)
 
             self.map    = signal.fftconvolve(map,   kernel, mode='same', 
-                                            axes = axes)
+                                            axes = axes).astype(np.float32)
             self.nhit   = signal.fftconvolve(nhit,  kernel, mode='same', 
-                                            axes = axes)
+                                            axes = axes).astype(np.int32)
             self.rms    = signal.fftconvolve(rms,   kernel, mode='same', 
-                                            axes = axes)
+                                            axes = axes).astype(np.float32)
 
             self.map = self.map.reshape(n0, n1, n2, n3)     # Reshaping back to original [..., sb, channel, ...] format
             self.nhit = self.nhit.reshape(n0, n1, n2, n3)
@@ -2255,9 +2282,9 @@ class Atlas:
             self.rms    = signal.fftconvolve(rms,  kernel[np.newaxis, :, :, :], 
                                             mode='same', axes = axes)
 
-            self.map = self.map.reshape(n0, n1, n2, n3, n4)     # Reshaping back to original [..., sb, channel, ...] format
-            self.nhit = self.nhit.reshape(n0, n1, n2, n3, n4)
-            self.rms = self.rms.reshape(n0, n1, n2, n3, n4)
+            self.map = self.map.reshape(n0, n1, n2, n3, n4).astype(np.float32)     # Reshaping back to original [..., sb, channel, ...] format
+            self.nhit = self.nhit.reshape(n0, n1, n2, n3, n4).astype(np.int32)
+            self.rms = self.rms.reshape(n0, n1, n2, n3, n4).astype(np.float32)
             
         elif len(map.shape) == 6:
             n0, n1, n2, n3, n4, n5 = map.shape
@@ -2274,9 +2301,9 @@ class Atlas:
             self.rms    = signal.fftconvolve(rms, kernel[np.newaxis, np.newaxis, :, :, :], 
                                             mode='same', axes = axes)
 
-            self.map = self.map.reshape(n0, n1, n2, n3, n4, n5)     # Reshaping back to original [..., sb, channel, ...] format
-            self.nhit = self.nhit.reshape(n0, n1, n2, n3, n4, n5)
-            self.rms = self.rms.reshape(n0, n1, n2, n3, n4, n5)
+            self.map = self.map.reshape(n0, n1, n2, n3, n4, n5).astype(np.float32)     # Reshaping back to original [..., sb, channel, ...] format
+            self.nhit = self.nhit.reshape(n0, n1, n2, n3, n4, n5).astype(np.int32)
+            self.rms = self.rms.reshape(n0, n1, n2, n3, n4, n5).astype(np.float32)
 
 if __name__ == "__main__":
     t = time.time()

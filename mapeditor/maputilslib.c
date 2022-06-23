@@ -44,6 +44,7 @@ void coadd4D(float* map1, int* nhit1, float* rms1,
     int prod1 = prod * n1;
     int idx;                    // Index of flattened arrays
     float inv_var1, inv_var2;   // Inverse variances
+    long int nhit_times_nhit; 
 
     // Looping through 4D datasets and coadding them.
     for(int i=0; i < n0; i++){
@@ -51,7 +52,9 @@ void coadd4D(float* map1, int* nhit1, float* rms1,
             for(int k=0; k < n2; k++){
                 for(int l=0; l < n3; l++){
                     idx = prod1 * i + prod * j + n3 * k + l;
-                    if (nhit1[idx] * nhit2[idx] > 0){
+                    nhit_times_nhit = nhit1[idx];
+                    nhit_times_nhit *= nhit2[idx];
+                    if (nhit_times_nhit > 0){
                         inv_var1  = 1.0 / (rms1[idx] * rms1[idx]);
                         inv_var2  = 1.0 / (rms2[idx] * rms2[idx]);
                         map[idx]  = map1[idx] * inv_var1 + map2[idx] * inv_var2;
@@ -111,6 +114,7 @@ void coadd5D(float* map1, int* nhit1, float* rms1,
     int prod2 =  prod1 * n1;
     int idx;                    // Index of flattened arrays
     float inv_var1, inv_var2;   // Inverse variances
+    long int nhit_times_nhit; 
 
     // Looping through 5D datasets and coadding them.
     for(int i=0; i < n0; i++){
@@ -119,7 +123,9 @@ void coadd5D(float* map1, int* nhit1, float* rms1,
                 for(int l=0; l < n3; l++){
                     for(int m=0; m < n4; m++){
                         idx = prod2 * i + prod1 * j + prod * k + n4 * l + m;
-                        if (nhit1[idx] * nhit2[idx] > 0){
+                        nhit_times_nhit = nhit1[idx];
+                        nhit_times_nhit *= nhit2[idx];
+                        if (nhit_times_nhit > 0){
                             inv_var1  = 1.0 / (rms1[idx] * rms1[idx]);
                             inv_var2  = 1.0 / (rms2[idx] * rms2[idx]);
                             map[idx]  = map1[idx] * inv_var1 + map2[idx] * inv_var2;
@@ -180,6 +186,7 @@ void coadd6D(float* map1, int* nhit1, float* rms1,
     int prod3 =  prod2 * n1;
     int idx;                    // Index of flattened arrays
     float inv_var1, inv_var2;   // Inverse variances
+    long int nhit_times_nhit; 
 
     // Looping through 6D datasets and coadding them.
     for(int i=0; i < n0; i++){
@@ -189,7 +196,9 @@ void coadd6D(float* map1, int* nhit1, float* rms1,
                     for(int m=0; m < n4; m++){
                         for(int n=0; n < n5; n++){
                             idx = prod3 * i + prod2 * j + prod1 * k + prod * l + n5 * m + n;
-                            if (nhit1[idx] * nhit2[idx] > 0){
+                            nhit_times_nhit = nhit1[idx];
+                            nhit_times_nhit *= nhit2[idx];
+                            if (nhit_times_nhit > 0){
                                 inv_var1  = 1.0 / (rms1[idx] * rms1[idx]);
                                 inv_var2  = 1.0 / (rms2[idx] * rms2[idx]);
                                 map[idx]  = map1[idx] * inv_var1 + map2[idx] * inv_var2;
@@ -252,14 +261,18 @@ void subtract4D(float* map1, int* nhit1, float* rms1,
     int prod1 = prod * n1;
     int idx;                // Index of flattened arrays
     float var1, var2;       // Inverse variances
-
+    
+    long int nhit_times_nhit; 
+    
     // Looping through 4D datasets and performing subtractions.
     for(int i=0; i < n0; i++){
         for(int j=0; j < n1; j++){
             for(int k=0; k < n2; k++){
                 for(int l=0; l < n3; l++){
                     idx = prod1 * i + prod * j + n3 * k + l;
-                    if (nhit1[idx] * nhit2[idx] > 0){
+                    nhit_times_nhit = nhit1[idx];
+                    nhit_times_nhit *= nhit2[idx];
+                    if (nhit_times_nhit > 0){
                         var1  = rms1[idx] * rms1[idx];
                         var2  = rms2[idx] * rms2[idx];
                         map[idx]  = map1[idx] - map2[idx];
@@ -318,6 +331,7 @@ void subtract5D(float* map1, int* nhit1, float* rms1,
     int prod2 =  prod1 * n1;
     int idx;                // Index of flattened arrays
     float var1, var2;       // Inverse variances
+    long int nhit_times_nhit; 
 
     // Looping through 5D datasets and performing subtractions.
     for(int i=0; i < n0; i++){
@@ -326,7 +340,9 @@ void subtract5D(float* map1, int* nhit1, float* rms1,
                 for(int l=0; l < n3; l++){
                     for(int m=0; m < n4; m++){
                         idx = prod2 * i + prod1 * j + prod * k + n4 * l + m;
-                        if (nhit1[idx] * nhit2[idx] > 0){
+                        nhit_times_nhit = nhit1[idx];
+                        nhit_times_nhit *= nhit2[idx];
+                        if (nhit_times_nhit > 0){
                             var1        = rms1[idx] * rms1[idx];
                             var2        = rms2[idx] * rms2[idx];
                             map[idx]    = map1[idx] - map2[idx];
@@ -387,6 +403,7 @@ void subtract6D(float* map1, int* nhit1, float* rms1,
     int prod3 =  prod2 * n1;
     int idx;                // Index of flattened arrays
     float var1, var2;       // Inverse variances
+    long int nhit_times_nhit; 
 
     // Looping through 5D datasets and performing subtractions.
     for(int i=0; i < n0; i++){
@@ -396,7 +413,9 @@ void subtract6D(float* map1, int* nhit1, float* rms1,
                     for(int m=0; m < n4; m++){
                         for(int n=0; n < n5; n++){
                             idx = prod3 * i + prod2 * j + prod1 * k + prod * l + n5 * m + n;
-                            if (nhit1[idx] * nhit2[idx] > 0){
+                            nhit_times_nhit = nhit1[idx];
+                            nhit_times_nhit *= nhit2[idx];
+                            if (nhit_times_nhit > 0){
                                 var1  = rms1[idx] * rms1[idx];
                                 var2  = rms2[idx] * rms2[idx];
                                 map[idx]  = map1[idx] - map2[idx];
@@ -457,6 +476,7 @@ void add4D(float* map1, int* nhit1, float* rms1,
     int prod1 = prod * n1;
     int idx;                // Index of flattened arrays
     float var1, var2;       // Inverse variances
+    long int nhit_times_nhit; 
 
     // Looping through 4D datasets and performing subtractions.
     for(int i=0; i < n0; i++){
@@ -464,7 +484,9 @@ void add4D(float* map1, int* nhit1, float* rms1,
             for(int k=0; k < n2; k++){
                 for(int l=0; l < n3; l++){
                     idx = prod1 * i + prod * j + n3 * k + l;
-                    if (nhit1[idx] * nhit2[idx] > 0){
+                    nhit_times_nhit = nhit1[idx];
+                    nhit_times_nhit *= nhit2[idx];
+                    if (nhit_times_nhit > 0){
                         var1  = rms1[idx] * rms1[idx];
                         var2  = rms2[idx] * rms2[idx];
                         map[idx]  = map1[idx] + map2[idx];
@@ -522,6 +544,7 @@ void add5D(float* map1, int* nhit1, float* rms1,
     int prod2 =  prod1 * n1;
     int idx;                // Index of flattened arrays
     float var1, var2;       // Inverse variances
+    long int nhit_times_nhit; 
 
     // Looping through 5D datasets and performing subtractions.
     for(int i=0; i < n0; i++){
@@ -530,7 +553,9 @@ void add5D(float* map1, int* nhit1, float* rms1,
                 for(int l=0; l < n3; l++){
                     for(int m=0; m < n4; m++){
                         idx = prod2 * i + prod1 * j + prod * k + n4 * l + m;
-                        if (nhit1[idx] * nhit2[idx] > 0){
+                        nhit_times_nhit = nhit1[idx];
+                        nhit_times_nhit *= nhit2[idx];
+                        if (nhit_times_nhit > 0){
                             var1        = rms1[idx] * rms1[idx];
                             var2        = rms2[idx] * rms2[idx];
                             map[idx]    = map1[idx] + map2[idx];
@@ -590,6 +615,7 @@ void add6D(float* map1, int* nhit1, float* rms1,
     int prod3 =  prod2 * n1;
     int idx;                // Index of flattened arrays
     float var1, var2;       // Inverse variances
+    long int nhit_times_nhit; 
 
     // Looping through 5D datasets and performing subtractions.
     for(int i=0; i < n0; i++){
@@ -599,7 +625,9 @@ void add6D(float* map1, int* nhit1, float* rms1,
                     for(int m=0; m < n4; m++){
                         for(int n=0; n < n5; n++){
                             idx = prod3 * i + prod2 * j + prod1 * k + prod * l + n5 * m + n;
-                            if (nhit1[idx] * nhit2[idx] > 0){
+                            nhit_times_nhit = nhit1[idx];
+                            nhit_times_nhit *= nhit2[idx];
+                            if (nhit_times_nhit > 0){
                                 var1  = rms1[idx] * rms1[idx];
                                 var2  = rms2[idx] * rms2[idx];
                                 map[idx]  = map1[idx] + map2[idx];
