@@ -88,7 +88,7 @@ class TsysMeasure:
                     tod_timesi = tod_times[tod_start_idx:tod_stop_idx]
                     tod_freq_mean = np.nanmean(todi, axis=(0,1))
                     if np.sum(tod_freq_mean > 0) > 10:  # Check number of valid points. Also catches NaNs.
-                        threshold_idxs = np.argwhere(tod_freq_mean > 0.95*np.max(tod_freq_mean))  # Points where tod is at least 95% of max. (We assume this is only true during Tsys measurement).
+                        threshold_idxs = np.argwhere(tod_freq_mean > 0.95*np.nanmax(tod_freq_mean))  # Points where tod is at least 95% of max. (We assume this is only true during Tsys measurement).
                         min_idxi = threshold_idxs[0][0] + 40  # Take the first and last of points fulfilling the above condition, assume they represent start and end of 
                         max_idxi = threshold_idxs[-1][0] - 40  # Tsys measurement, and add a 40-idx safety margin (I think this is 40*20ms = approx 1 second.)
                         min_idx_vane = np.argmin(np.abs(self.vane_times - tod_timesi[min_idxi]))

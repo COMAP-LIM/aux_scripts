@@ -916,210 +916,210 @@ def plot_pca_maps(map, outpath, color_lim = [-3e-2, 3e-2], feeds = range(20)):
     fig.savefig(outpath + "pca/" + map.outname + "_primary_pca" + ".png", bbox_inches = 'tight', dpi = 300)
     #plt.show()
         
+if __name__ == "__main__":
+        #plt.show()
 
-    #plt.show()
+    #mappath = "/mn/stornext/d22/cmbco/comap/d16/protodir/maps/"
+    #mappath = "/mn/stornext/d22/cmbco/comap/nils/COMAP_general/data/maps/new_pca/new/" 
+    mappath = "/mn/stornext/d22/cmbco/comap/nils/COMAP_general/data/maps/new_pca/" 
+    #mappath = "/mn/stornext/d22/cmbco/comap/nils/COMAP_general/data/maps/new_pca/old/"
+    outpath = "/mn/stornext/d22/cmbco/comap/nils/comap_aux/plotbrowser/test_figs/mapplots/good_subset/"
+    #outpath = "/mn/stornext/d16/cmbco/comap/nils/plotbrowser/test_figs/mapplots/"
 
-#mappath = "/mn/stornext/d22/cmbco/comap/d16/protodir/maps/"
-#mappath = "/mn/stornext/d22/cmbco/comap/nils/COMAP_general/data/maps/new_pca/new/" 
-mappath = "/mn/stornext/d22/cmbco/comap/nils/COMAP_general/data/maps/new_pca/" 
-#mappath = "/mn/stornext/d22/cmbco/comap/nils/COMAP_general/data/maps/new_pca/old/"
-outpath = "/mn/stornext/d22/cmbco/comap/nils/comap_aux/plotbrowser/test_figs/mapplots/good_subset/"
-#outpath = "/mn/stornext/d16/cmbco/comap/nils/plotbrowser/test_figs/mapplots/"
+    #obsid   = "012338"
+    #obsid   = "012115"
+    #obsid    = "015021"
+    #obsid    = "008344"
+    #obsid    = "013615"
+    #obsid    = "007243"
+    #obsid    = "006879"
+    #obsid    = "007680"
 
-#obsid   = "012338"
-#obsid   = "012115"
-#obsid    = "015021"
-#obsid    = "008344"
-#obsid    = "013615"
-#obsid    = "007243"
-#obsid    = "006879"
-#obsid    = "007680"
-
-#field   = "co2"
-#name    = "map_test_high_ps_chi2_smoothed_downsampled"
-#name    = "map_test_high_ps_chi2_downsampled"
-#name    = "map_test_high_ps_chi2_smoothed"
-#name    = "map_test_high_ps_chi2"
-#name    = "co6_map_old_pca.h5"
+    #field   = "co2"
+    #name    = "map_test_high_ps_chi2_smoothed_downsampled"
+    #name    = "map_test_high_ps_chi2_downsampled"
+    #name    = "map_test_high_ps_chi2_smoothed"
+    #name    = "map_test_high_ps_chi2"
+    #name    = "co6_map_old_pca.h5"
 
 
-mapeditor = Atlas(no_init = True)
+    mapeditor = Atlas(no_init = True)
 
-"""
-allmaps = os.listdir(mappath)
+    """
+    allmaps = os.listdir(mappath)
 
-#allmaps = [f for f in allmaps if re.match(r"co\d_\d{6}_\d{6}_map.h5", f)]
-#allmaps = [f for f in allmaps if re.match(r"co\d_\d{8}_map_old_pca.h5", f)]
-allmaps = [f for f in allmaps if re.match(r"co\d_\d{8}_map_old_pca_wo_lowelev.h5", f)]
-#allmaps = [f for f in allmaps if re.match(r"co\d_011837\d{2}_map_old_pca_wo_lowelev.h5", f)]
+    #allmaps = [f for f in allmaps if re.match(r"co\d_\d{6}_\d{6}_map.h5", f)]
+    #allmaps = [f for f in allmaps if re.match(r"co\d_\d{8}_map_old_pca.h5", f)]
+    allmaps = [f for f in allmaps if re.match(r"co\d_\d{8}_map_old_pca_wo_lowelev.h5", f)]
+    #allmaps = [f for f in allmaps if re.match(r"co\d_011837\d{2}_map_old_pca_wo_lowelev.h5", f)]
 
-#allmaps = [f for f in allmaps if re.match(r"co\d_map_old_pca.h5", f)]
-#allmaps = ["co7_016493_201229_map.h5"]
-print(allmaps)
-feeds = list(range(19))
-for name in tqdm(allmaps):
-    obsid = name.split("_")[1]
+    #allmaps = [f for f in allmaps if re.match(r"co\d_map_old_pca.h5", f)]
+    #allmaps = ["co7_016493_201229_map.h5"]
+    print(allmaps)
+    feeds = list(range(19))
+    for name in tqdm(allmaps):
+        obsid = name.split("_")[1]
 
-    try:
-        #feed    = 12
-        print(name)
-        scanmaps    = {}
-        #obsname = mappath + f"{field}_{obsid}_{name}.h5"
-        #obsname = mappath + f"co2_map_summer.h5"
-        #obsname = f"co2_map_summer_liss.h5"
-        #obsname = f"co6_map_signal_new_data_liss.h5"
-        #obsmap  = Map(name)
-        #scans   = range(2, 16)
+        try:
+            #feed    = 12
+            print(name)
+            scanmaps    = {}
+            #obsname = mappath + f"{field}_{obsid}_{name}.h5"
+            #obsname = mappath + f"co2_map_summer.h5"
+            #obsname = f"co2_map_summer_liss.h5"
+            #obsname = f"co6_map_signal_new_data_liss.h5"
+            #obsmap  = Map(name)
+            #scans   = range(2, 16)
 
-        mapobj = Map(mappath + name)
-        mapobj.read_map()
-        #mapobj.outname = f"{field}_{obsid}_{name}_feed{feed}"
+            mapobj = Map(mappath + name)
+            mapobj.read_map()
+            #mapobj.outname = f"{field}_{obsid}_{name}_feed{feed}"
 
-        #mapobj.outname = f"co2_map_summer_liss"
-        #print(name.split(".h5")[0])
-        mapobj.outname = name.split(".h5")[0]
-        mapobj.scanmap = False
-        mapobj.obsmap  = True
-        mapobj.obsid   = int(obsid)
-        #plot_skewness_maps(mapobj, feed = feed)
-        if np.all(mapobj.nhit == 0):
-            print("Map:", name, "is empty!")
+            #mapobj.outname = f"co2_map_summer_liss"
+            #print(name.split(".h5")[0])
+            mapobj.outname = name.split(".h5")[0]
+            mapobj.scanmap = False
+            mapobj.obsmap  = True
+            mapobj.obsid   = int(obsid)
+            #plot_skewness_maps(mapobj, feed = feed)
+            if np.all(mapobj.nhit == 0):
+                print("Map:", name, "is empty!")
+                continue
+
+            print(mapobj.map.shape)
+
+            mapeditor.merge_numXY = 2
+            mapeditor.C_dgradeXY5D(mapobj.map, mapobj.nhit, mapobj.rms)
+            mapobj.map, mapobj.nhit, mapobj.rms = mapeditor.map, mapeditor.nhit, mapeditor.rms
+            x = mapobj.x.reshape(int(len(mapobj.x) / mapeditor.merge_numXY), mapeditor.merge_numXY) 
+            y = mapobj.y.reshape(int(len(mapobj.y) / mapeditor.merge_numXY), mapeditor.merge_numXY)
+            mapobj.x      = np.mean(x, axis = 1)   # Finding new pixel center by averaging neighboring pixel x coordinates
+            mapobj.y      = np.mean(y, axis = 1)   # Finding new pixel center by averaging neighboring pixel x coordinates
+
+            mapobj.n_x,  mapobj.n_y = mapobj.map.shape[3:]
+
+            plot_pca_maps(mapobj, feeds = feeds)
+        except:
+            continue
+    sys.exit()
+    """
+
+    feed    = 5
+    feeds = list(range(19))
+    field  = "co6"
+    scanmaps    = {}
+    #obsname = mappath + f"{field}_{obsid}_{name}.h5"
+    #obsname = mappath + f"co6_map_old_pca.h5"
+    #obsname = mappath + f"co6_map_new_pca.h5"
+    #obsname = mappath + f"co6_map_new_pca_wo_highelev.h5"
+    #obsname = mappath + f"co6_map_old_pca_wo_lowelev.h5"
+    #obsname = mappath + f"co6_map_new_pca_with_downsamp.h5"
+
+    # obsname = mappath + f"co6_map_new_pca_wo_downsamp.h5"
+    # obsname = mappath + f"co6_map_new_pca_downsamp_corrclean.h5"
+    # obsname = mappath + f"co2_map_good_az_edge_cut.h5"
+    # obsname = mappath + f"co2_map_good_diff_pca_params.h5"
+    obsname = mappath + f"co2_map_good_wo_highpass.h5"
+    #obsname = mappath + f"co2_map_summer.h5"
+    #obsname = f"co2_map_summer_liss.h5"
+    #obsname = f"co6_map_signal_new_data_liss.h5"
+    obsmap  = Map(obsname)
+    scans   = range(2, 16)
+
+    mapobj = Map(obsname)
+    mapobj.read_map()
+    #mapobj.outname = f"co6_map_old_pca_v3"
+    #mapobj.outname = f"co6_map_new_pca_wo_highelev"
+    #mapobj.outname = f"co6_map_new_pca_with_downsamp"
+    # mapobj.outname = f"co6_map_new_pca_wo_downsamp"
+    #mapobj.outname = f"co2_map_good_diff_pca_params"
+    mapobj.outname = f"co2_map_good_wo_highpass"
+
+    #mapobj.outname = f"co2_map_summer_liss"
+    #mapobj.outname = f"co2_map_good_diff_pca_params"
+    #mapobj.outname = f"co6_map_signal_new_data_liss"
+    mapobj.scanmap = False
+    mapobj.obsmap  = True
+    #mapobj.obsid   = int(obsid)
+    mapobj.obsid   = None
+
+    #plot_skewness_maps(mapobj, feed = feed)
+    plot_pca_maps(mapobj, outpath, feeds = feeds)
+
+    sys.exit()
+
+    mapeditor.merge_numZ  = 16
+    mapeditor.C_dgradeZ5D(mapobj.map, mapobj.nhit.astype(np.int32), mapobj.rms)
+    mapobj.map, mapobj.nhit, mapobj.rms = mapeditor.map, mapeditor.nhit, mapeditor.rms
+
+    climabs = 1e6 * 0.2 * np.max(np.abs(mapobj.map / mapobj.rms))
+    plot_sb_avg_maps(mapobj, color_lim = [0, climabs], feed = feed)
+
+    clim = 1e6 * np.nanstd(np.where(mapobj.nhit > 1, mapobj.map, np.nan))
+    plot_quarter_sb_avg_maps(mapobj, color_lim = [-clim, clim], feed = feed)
+
+
+    plot_quarter_sb_avg_column_maps(mapobj)
+
+    #sys.exit()
+
+
+    for i in tqdm(scans):
+        scanid = f"{obsid}{i:02}"
+        scanname = mappath + f"{field}_{scanid}_{name}.h5"
+        try:
+            mapobj = Map(scanname)
+            mapobj.read_map()
+            mapobj.outname = f"{field}_{scanid}_{name}"
+            mapobj.scanmap = True
+            mapobj.obsmap  = False
+            mapobj.obsid   = int(obsid)
+            mapobj.scanid  = int(scanid)
+
+            scanmaps[scanid] = mapobj
+
+        except:
+            print(f"No map found for scan {scanid}!")
             continue
 
-        print(mapobj.map.shape)
 
-        mapeditor.merge_numXY = 2
-        mapeditor.C_dgradeXY5D(mapobj.map, mapobj.nhit, mapobj.rms)
+        if np.all(mapobj.map[feed, ...] == 0):
+            print("All map elements are zero!")
+            continue
+
+        if np.all(mapobj.nhit[feed, ...] == 0):
+            print("All nhit elements are zero!")
+            continue
+
+        if np.all(mapobj.rms[feed, ...] == 0):
+            print("All rms elements are zero!")
+            continue
+
+
+        
+        #plot_pca_maps(mapobj, feed = feed)
+        
+        mapeditor.merge_numXY = 4
+        mapeditor.merge_numZ  = 16
+        mapeditor.C_dgradeXYZ5D(mapobj.map, mapobj.nhit, mapobj.rms)
         mapobj.map, mapobj.nhit, mapobj.rms = mapeditor.map, mapeditor.nhit, mapeditor.rms
+
+        mapeditor.n_sigma = 1
+        mapeditor.sigmaX  = 8e-1
+        mapeditor.sigmaY  = 8e-1
+
+        mapeditor.gaussian_smoothXY(mapobj.map, mapobj.nhit, mapobj.rms)
+        mapobj.map, mapobj.nhit, mapobj.rms = mapeditor.map, mapeditor.nhit, mapeditor.rms
+
+        mapobj.n_det, mapobj.n_sb, mapobj.n_freq, mapobj.n_x, mapobj.n_y = mapobj.map.shape
+
+
         x = mapobj.x.reshape(int(len(mapobj.x) / mapeditor.merge_numXY), mapeditor.merge_numXY) 
         y = mapobj.y.reshape(int(len(mapobj.y) / mapeditor.merge_numXY), mapeditor.merge_numXY)
         mapobj.x      = np.mean(x, axis = 1)   # Finding new pixel center by averaging neighboring pixel x coordinates
         mapobj.y      = np.mean(y, axis = 1)   # Finding new pixel center by averaging neighboring pixel x coordinates
 
-        mapobj.n_x,  mapobj.n_y = mapobj.map.shape[3:]
-
-        plot_pca_maps(mapobj, feeds = feeds)
-    except:
-        continue
-sys.exit()
-"""
-
-feed    = 5
-feeds = list(range(19))
-field  = "co6"
-scanmaps    = {}
-#obsname = mappath + f"{field}_{obsid}_{name}.h5"
-#obsname = mappath + f"co6_map_old_pca.h5"
-#obsname = mappath + f"co6_map_new_pca.h5"
-#obsname = mappath + f"co6_map_new_pca_wo_highelev.h5"
-#obsname = mappath + f"co6_map_old_pca_wo_lowelev.h5"
-#obsname = mappath + f"co6_map_new_pca_with_downsamp.h5"
-
-# obsname = mappath + f"co6_map_new_pca_wo_downsamp.h5"
-# obsname = mappath + f"co6_map_new_pca_downsamp_corrclean.h5"
-# obsname = mappath + f"co2_map_good_az_edge_cut.h5"
-# obsname = mappath + f"co2_map_good_diff_pca_params.h5"
-obsname = mappath + f"co2_map_good_wo_highpass.h5"
-#obsname = mappath + f"co2_map_summer.h5"
-#obsname = f"co2_map_summer_liss.h5"
-#obsname = f"co6_map_signal_new_data_liss.h5"
-obsmap  = Map(obsname)
-scans   = range(2, 16)
-
-mapobj = Map(obsname)
-mapobj.read_map()
-#mapobj.outname = f"co6_map_old_pca_v3"
-#mapobj.outname = f"co6_map_new_pca_wo_highelev"
-#mapobj.outname = f"co6_map_new_pca_with_downsamp"
-# mapobj.outname = f"co6_map_new_pca_wo_downsamp"
-#mapobj.outname = f"co2_map_good_diff_pca_params"
-mapobj.outname = f"co2_map_good_wo_highpass"
-
-#mapobj.outname = f"co2_map_summer_liss"
-#mapobj.outname = f"co2_map_good_diff_pca_params"
-#mapobj.outname = f"co6_map_signal_new_data_liss"
-mapobj.scanmap = False
-mapobj.obsmap  = True
-#mapobj.obsid   = int(obsid)
-mapobj.obsid   = None
-
-#plot_skewness_maps(mapobj, feed = feed)
-plot_pca_maps(mapobj, outpath, feeds = feeds)
-
-sys.exit()
-
-mapeditor.merge_numZ  = 16
-mapeditor.C_dgradeZ5D(mapobj.map, mapobj.nhit.astype(np.int32), mapobj.rms)
-mapobj.map, mapobj.nhit, mapobj.rms = mapeditor.map, mapeditor.nhit, mapeditor.rms
-
-climabs = 1e6 * 0.2 * np.max(np.abs(mapobj.map / mapobj.rms))
-plot_sb_avg_maps(mapobj, color_lim = [0, climabs], feed = feed)
-
-clim = 1e6 * np.nanstd(np.where(mapobj.nhit > 1, mapobj.map, np.nan))
-plot_quarter_sb_avg_maps(mapobj, color_lim = [-clim, clim], feed = feed)
-
-
-plot_quarter_sb_avg_column_maps(mapobj)
-
-#sys.exit()
-
-
-for i in tqdm(scans):
-    scanid = f"{obsid}{i:02}"
-    scanname = mappath + f"{field}_{scanid}_{name}.h5"
-    try:
-        mapobj = Map(scanname)
-        mapobj.read_map()
-        mapobj.outname = f"{field}_{scanid}_{name}"
-        mapobj.scanmap = True
-        mapobj.obsmap  = False
-        mapobj.obsid   = int(obsid)
-        mapobj.scanid  = int(scanid)
-
-        scanmaps[scanid] = mapobj
-
-    except:
-        print(f"No map found for scan {scanid}!")
-        continue
-
-
-    if np.all(mapobj.map[feed, ...] == 0):
-        print("All map elements are zero!")
-        continue
-
-    if np.all(mapobj.nhit[feed, ...] == 0):
-        print("All nhit elements are zero!")
-        continue
-
-    if np.all(mapobj.rms[feed, ...] == 0):
-        print("All rms elements are zero!")
-        continue
-
-
-    
-    #plot_pca_maps(mapobj, feed = feed)
-    
-    mapeditor.merge_numXY = 4
-    mapeditor.merge_numZ  = 16
-    mapeditor.C_dgradeXYZ5D(mapobj.map, mapobj.nhit, mapobj.rms)
-    mapobj.map, mapobj.nhit, mapobj.rms = mapeditor.map, mapeditor.nhit, mapeditor.rms
-
-    mapeditor.n_sigma = 1
-    mapeditor.sigmaX  = 8e-1
-    mapeditor.sigmaY  = 8e-1
-
-    mapeditor.gaussian_smoothXY(mapobj.map, mapobj.nhit, mapobj.rms)
-    mapobj.map, mapobj.nhit, mapobj.rms = mapeditor.map, mapeditor.nhit, mapeditor.rms
-
-    mapobj.n_det, mapobj.n_sb, mapobj.n_freq, mapobj.n_x, mapobj.n_y = mapobj.map.shape
-
-
-    x = mapobj.x.reshape(int(len(mapobj.x) / mapeditor.merge_numXY), mapeditor.merge_numXY) 
-    y = mapobj.y.reshape(int(len(mapobj.y) / mapeditor.merge_numXY), mapeditor.merge_numXY)
-    mapobj.x      = np.mean(x, axis = 1)   # Finding new pixel center by averaging neighboring pixel x coordinates
-    mapobj.y      = np.mean(y, axis = 1)   # Finding new pixel center by averaging neighboring pixel x coordinates
-
-    plot_sb_avg_maps(mapobj, color_lim = [0, climabs], feed = feed)                    
-    plot_quarter_sb_avg_maps(mapobj, color_lim = [-clim, clim], feed = feed)
+        plot_sb_avg_maps(mapobj, color_lim = [0, climabs], feed = feed)                    
+        plot_quarter_sb_avg_maps(mapobj, color_lim = [-clim, clim], feed = feed)
 
 

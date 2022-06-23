@@ -1,17 +1,22 @@
 import time
 import sys
 import getopt
+from typing import Type
 import numpy as np
 from scipy import signal
 import h5py as h5
 import textwrap
 import ctypes
+import argparse
 
 class Atlas:
-    def __init__(self):
+    def __init__(self, terminal_mode = True, save_outmap = True, no_init = False, infile1 = None, infile2 = None, outfile = None, spl = None, split = None, 
+                det_list = range(1,20), sb_list = range(1,5), freq_list = range(1,65), beam = False, full = False,
+                coadd = False, add = False, subtract = False, dgrade_list = None, ugrade_list = None, smooth_list = None, n_sigma = 5):
         """
         Initiating Atlas class and setting class attributes and default command line arguments
         """
+<<<<<<< HEAD
         self.jk_choices   = ["odde", "dayn", "half", "sdlb", "sidr"]    # Possible choices of jackknife modes.
         self.jk           = None                                        # If no jackknife argument is given self.jk will be None.
         self.jack         = False                                       # If ture operations are performed on jackknives, changes to 
@@ -38,33 +43,366 @@ class Atlas:
         #self.maputilslib = ctypes.cdll.LoadLibrary("maputilslib.so.1")  # Load shared C utils library.
 
         self.input()    # Calling the input function to set variables dependent on command line input.
+=======
+        if not no_init:
+            self.save_outmap = save_outmap
+>>>>>>> 9fec3c88050fafe953e510ce96a61332d0d2a465
 
-        if self.infile1 != None and self.infile2 != None:
-            """Checking whether both input files have jackknife datasets"""
-            if self.jack and ("jackknives" not in self.dfile1 or "jackknives" not in self.dfile2):
-                print("One or both of the input files does not contain any jackknife information!")
-                sys.exit()
+            self.add = add
+            self.subtract = subtract
+            self.coadd = coadd 
+            self.dgrade_list = dgrade_list
+            self.ugrade_list = ugrade_list
+            self.smooth_list = smooth_list
+            self.n_sigma      = n_sigma                 # Default n_sigma; used for defining the Gaussian smoothing kernel's grid.
+            
+            self.det_list = det_list
+            self.sb_list  = sb_list
+            self.freq_list = freq_list 
 
-        if not self.full and not self.beam and not self.jack:
-            """Checking whether to process all datasets"""
-            self.everything = True
+            self.spl_choices   = ["odde", "dayn", "half", "sdlb", "sidr"]    # Possible choices of split modes.
+            self.spl           = spl                                          # If no split argument is given self.spl will be None.
+            self.split         = split                                        # If ture operations are performed on splits, changes to 
+                                                                            #true if split command line input is given.
+
+            self.tool_choices   = ["coadd", "subtract", "add", "dgradeXY", "dgradeZ", "dgradeXYZ",
+                                                            "ugradeXY", "ugradeZ", "ugradeXYZ",
+                                                            "smoothXY", "smoothZ", "smoothXYZ"]     # Tool choices.
+            self.tool         = None                    # Default tool is coadd.
+            self.det_list     = np.arange(1,20)         # List of detectors to use, default all.
+            self.sb_list      = np.arange(1,5)          # List of sidebands to use, default all.
+            self.freq_list    = np.arange(1,65)         # List of frequency channels per sideband, default all.
+            self.outfile      = outfile                 # Output file name.
+
+            self.beam        = beam    # If true subsequent operations are only performed on _beam dataset.
+            self.full        = full    # If true subsequent operations are only performed on full dataset.
+            self.everything  = False    # If true full, beam and splitknive datasets are all processed.
+            self.patch1       = ''      # Patch name of first infile.
+            self.patch2       = ''      # Patch name of second infile.
+            self.infile1      = infile1    # Fist infile name.
+            self.infile2      = infile2    # Second infile name.
+            self.maputilslib = ctypes.cdll.LoadLibrary("/mn/stornext/d16/cmbco/comap/protodir/auxiliary/maputilslib.so.1")  # Load shared C utils library.
+            #self.maputilslib = ctypes.cdll.LoadLibrary("maputilslib.so.1")  # Load shared C utils library.
+
+            if terminal_mode:
+                self.input()    # Calling the input function to set variables dependent on command line input.
+
             if self.infile1 != None and self.infile2 != None:
-                if "jackknives" in self.dfile1 and "jackknives" in self.dfile2:
-                    nhit_lst = [i for i in self.dfile1["jackknives"].keys() if "nhit_" in i]
-                    self.jk =  [i.split("_")[1] for i in nhit_lst]
-            else: 
-                if "jackknives" in self.dfile1:
-                    nhit_lst = [i for i in self.dfile1["jackknives"].keys() if "nhit_" in i]
-                    self.jk =  [i.split("_")[1] for i in nhit_lst]
-        
-        self.ofile = h5.File(self.outfile, "w")             # Opening outfile object with write access.   
-        self.operation()                                    # Calling operations to perform operation with tool given in command line.
-        self.dfile1.close()                                 # Closing first input file.
-        if self.infile1 != None and self.infile2 != None:   
-            self.dfile2.close()                             # Closing second input file if provided.
-        self.ofile.close()                                  # Closing output file.
+                """Checking whether both input files have split datasets"""
+                if self.split and ("splits" not in self.dfile1 or "splits" not in self.dfile2):
+                    print("One or both of the input files does not contain any split information!")
+                    sys.exit()
+
+            if not self.full and not self.beam and not self.split:
+                """Checking whether to process all datasets"""
+                self.everything = True
+                if self.infile1 != None and self.infile2 != None:
+                    if "splits" in self.dfile1 and "splits" in self.dfile2:
+                        nhit_lst = [i for i in self.dfile1["splits"].keys() if "nhit_" in i]
+                        self.spl =  [i.split("_")[1] for i in nhit_lst]
+                else: 
+                    if "splits" in self.dfile1:
+                        nhit_lst = [i for i in self.dfile1["splits"].keys() if "nhit_" in i]
+                        self.spl =  [i.split("_")[1] for i in nhit_lst]
+            if self.save_outmap:
+                self.ofile = h5.File(self.outfile, "w")         # Opening outfile object with write access.   
+
+            self.operation()                                    # Calling operations to perform operation with tool given in command line.
+            self.dfile1.close()                                 # Closing first input file.
+            if self.infile1 != None and self.infile2 != None:   
+                self.dfile2.close()                             # Closing second input file if provided.
+            if self.save_outmap:
+                self.ofile.close()                              # Closing output file.
+
 
     def input(self):
+        """
+        Function parsing the command line input.
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument("-i", "--infile1", type=str, default=None, 
+                            help="Full path to first input map. Must be specified, even if operations are only to be performed on single map.")
+        parser.add_argument("-I", "--infile2", type=str, default=None, 
+                            help="Full path to second input map. Must be specified only for opterations requiering two maps.")
+        parser.add_argument("-o", "--outfile", type=str, default=None, 
+                            help="Full path to output map.")
+        parser.add_argument("-N", "--splitname", type=str, default=None,
+                            help="Name of split datasets, e.g. elev, cesc, ambt.")
+        parser.add_argument("-d", "--detectors", type=str, default="range(1,20)", 
+                            help="List of detectors(feeds), on format which evals to Python list or iterable, e.g. [1,4,9] or range(2,6).")
+        parser.add_argument("-s", "--sidebands", type=str, default="range(1,5)", 
+                            help="List of sidebands, on format which evals to Python list or iterable, e.g. [1,2], [3], or range(1,3).")
+        parser.add_argument("-f", "--frequencies", type=str, default="range(1,65)", 
+                            help="List of frequencies, on format which evals to Python list or iterable, e.g. [34,36,41], [43], or range(12,44). Note that if you specify a frequency, a single sideband must be selected.")
+        parser.add_argument("-b", "--beam", action = "store_true", 
+                            help="Only operate on feed-coadded datasets.")
+        parser.add_argument("-F", "--full", action = "store_true", 
+                            help="Operate only on all-detector maps datasets.")
+        parser.add_argument("-C", "--coadd", action = "store_true", 
+                            help="Whether to coadd two maps together.")
+        parser.add_argument("-S", "--subtract", action = "store_true", 
+                            help="Whether to subtract two maps from each other.")
+        parser.add_argument("-A", "--add", action = "store_true", 
+                            help="Whether to add two maps together.")
+        parser.add_argument("-D", "--dgrade", type=str, default = None,
+                            help="""\
+                    To use dgrade tool please provide a number of pixels (voxels) to co-merge along each 
+                    axis in a list; e.g. [4,2]. First and second entries correspond to respectively to (x,y) and (z) 
+                    operations.
+                    """)
+        parser.add_argument("-U", "--ugrade", type=str,  default = None,
+                            help="""\
+                    To use ugrade tool please provide a number of pixels (voxels) to expand along each 
+                    axis in a list; e.g. [4,2]. First and second entries correspond to respectively to (x,y) and (z) 
+                    operations..
+                    """)
+        parser.add_argument("-G", "--smoothing", type=str,  default = None,
+                            help="""\
+                    To use smoothing tool please provide the std of gaussian smoothing kernel along each 
+                    axis in a list; e.g. [4,2]. First and second entries correspond to respectively to (x,y) and (z) 
+                    operations.
+                    """)
+        parser.add_argument("-n", "--nsigma", type=str, default="5",
+                            help="Number of sigmas to use in gaussian smoothing kernal. Default is 5.")
+        
+        args = parser.parse_args()
+        
+        self.infile1 = args.infile1
+        self.infile2 = args.infile2
+        self.outfile = args.outfile
+        self.beam    = args.beam
+        self.full    = args.full
+        self.coadd   = args.coadd
+        self.add     = args.add
+        self.freq_list  = args.frequencies
+        self.sb_list    = args.sidebands
+        self.det_list   = args.detectors
+        self.splitlist  = args.splitname
+
+        self.subtract    = args.subtract
+        self.dgrade_list = args.dgrade
+        self.ugrade_list = args.ugrade
+        self.smooth_list = args.smoothing
+        self.n_sigma     = args.nsigma
+    
+        try:
+            if isinstance(self.infile1, str):
+                self.dfile1  = h5.File(self.infile1,'r')
+                temp = self.infile1.split('/')[-1]
+                self.patch1 = temp.split('_')[0]
+            else:
+                raise TypeError
+        except TypeError:
+            print("Please provide first input map (must always be given)!")
+            sys.exit()
+
+        try:
+            if self.splitlist != None:
+                self.splitlist  = eval(self.splitlist)
+                if isinstance(self.splits, list):
+                    self.splits = True
+                else:
+                    raise TypeError
+        except TypeError:
+            print("Please provide split list as list of split names, e.g. ['elev','cesc','ambt'].")
+            sys.exit()
+        
+        try:
+            if self.det_list != None:
+                self.det_list = list(eval(self.det_list))
+                if isinstance(self.det_list, list):
+                    if 0 in self.det_list:
+                        print("Use 1-base, not 0-base please")
+                        sys.exit()
+                    self.det_list = np.array(self.det_list, dtype = int)
+                else:
+                    raise TypeError
+        except TypeError:
+            print("Detectors my be inserted as a list or array, ie. -d [1,2,5,7]")
+            sys.exit()
+        
+        try:
+            if self.sb_list != None:
+                self.sb_list = list(eval(self.sb_list))
+                if isinstance(self.sb_list, list):
+                    if 0 in self.sb_list:
+                        print("Use 1-base, not 0-base please")
+                        sys.exit()
+                    self.sb_list = np.array(self.sb_list, dtype = int)
+                else:
+                    raise TypeError
+        except TypeError:
+            print("Side bands my be inserted as a list or array, ie. -d [1,2,4]")
+            sys.exit()
+
+        try:
+            if self.freq_list != None:
+                self.freq_list = list(eval(self.freq_list))
+                if isinstance(self.freq_list, list):
+                    if 0 in self.freq_list:
+                        print("Use 1-base, not 0-base please")
+                        sys.exit()
+                    if np.any(np.array(self.freq_list) > 64):
+                        print("There are only 64 frequencies pr. side band")
+                        sys.exit()
+                    self.freq_list = np.array(self.freq_list, dtype = int)
+                else:
+                    raise TypeError
+        except TypeError:
+            print("Frequencies my be inserted as a list or array, ie. -n [1,34,50]")
+            sys.exit()
+
+        try:
+            if self.dgrade_list != None:
+                self.dgrade_list = eval(self.dgrade_list)
+                if isinstance(self.dgrade_list, list):
+                    if len(self.dgrade_list) == 2:
+                        self.merge_numXY, self.merge_numZ = self.dgrade_list
+                        n_x = np.array(self.dfile1["n_x"])
+                        n_y = np.array(self.dfile1["n_y"])
+                        n_z = self.dfile1["freq"].shape[1]
+                        message = """\
+                        Make sure that the voxel grid resolution of input map 
+                        file is a multiple of the number of merging pixels!
+                        """
+
+                        if self.merge_numXY != 0 and self.merge_numZ != 0:
+                            self.tool = "dgradeXYZ"
+                            
+                            if self.merge_numXY != 0:
+                                if n_x % self.merge_numXY != 0 or n_y % self.merge_numXY != 0: 
+                                    print(textwrap.dedent(message))
+                                    sys.exit()
+                                if self.merge_numZ == 0:
+                                    self.tool = "dgradeXY"
+
+                            if self.merge_numZ != 0:
+                                if n_z % self.merge_numZ != 0: 
+                                    print(textwrap.dedent(message))
+                                    sys.exit()
+                                if self.merge_numXY == 0:
+                                    self.tool = "dgradeZ"
+                    else:
+                        print("List for dgrade must have length two!")
+                        sys.exit()
+                else:
+                    raise TypeError
+        except TypeError:
+            print("""Dgrade must provide list of elements along each axis to co-merge, e.g. [4,2]. 
+                    First and second entries correspond to respectively to (x,y) and (z) 
+                    operations.)""")
+            sys.exit()
+
+        try:
+            if self.ugrade_list != None:
+                self.ugrade_list = eval(self.ugrade_list)
+                if isinstance(self.ugrade_list, list):
+                    if len(self.ugrade_list) == 2:
+                        self.merge_numXY, self.merge_numZ = self.ugrade_list
+                        n_x = np.array(self.dfile1["n_x"])
+                        n_y = np.array(self.dfile1["n_y"])
+                        n_z = self.dfile1["freq"].shape[1]
+                        message = """\
+                        Make sure that the voxel grid resolution of input map 
+                        file is a multiple of the number of merging pixels!
+                        """
+                        if self.merge_numXY != 0 and self.merge_numZ != 0:
+                            self.tool = "ugradeXYZ"
+                        
+                        if self.merge_numXY != 0:
+                            if n_x % self.merge_numXY != 0 or n_y % self.merge_numXY != 0: 
+                                print(textwrap.dedent(message))
+                                sys.exit()
+                            if self.merge_numZ == 0:
+                                self.tool = "ugradeXY"
+
+                        if self.merge_numZ != 0:
+                            if n_z % self.merge_numZ != 0: 
+                                print(textwrap.dedent(message))
+                                sys.exit()
+                            if self.merge_numXY == 0:
+                                self.tool = "ugradeZ"
+                    else:
+                        print("List for ugrade must have length two!")
+                        sys.exit()
+                else:
+                    raise TypeError
+        except TypeError:
+            print("""Ugrade must provide list of elements along each axis to expand, e.g. [4,2]. 
+                    First and second entries correspond to respectively to (x,y) and (z) 
+                    operations.""")
+            sys.exit()
+
+        try:
+            if self.smooth_list != None:
+                self.smooth_list = eval(self.smooth_list)
+                if isinstance(self.smooth_list, list):
+                    if len(self.smooth_list) == 2:
+                        self.sigmaXY, self.sigmaZ = self.smooth_list
+                        self.sigmaX = self.sigmaY = self.sigmaXY
+                        message = """\
+                        """
+                        if self.sigmaXY != 0 and self.sigmaZ != 0:
+                            self.tool = "smoothXYZ"
+                        
+                        if self.sigmaXY != 0:
+                            if self.sigmaZ == 0:
+                                self.tool = "smoothXY"
+
+                        if self.sigmaZ != 0:
+                            if self.sigmaXY == 0:
+                                self.tool = "smoothZ"
+                    else:
+                        print("List for smoothing kernal sigmas must have length two (i.e. sigmaXY and sigmaZ)!")
+                        sys.exit()
+                else:
+                    raise TypeError
+        except TypeError:
+            print("""To use smoothing tool please provide the std of gaussian smoothing kernel along each 
+                axis in a list; e.g. [4,2]. First and second entries correspond to respectively to (x,y) and (z) 
+                    operations.""")
+            sys.exit()
+        
+        try:
+            self.n_sigma = eval(self.n_sigma)
+        except TypeError:
+            print("n_sigma must be integer!")
+
+        try:
+            if self.infile2 != None:
+                if isinstance(self.infile2, str):
+                    self.dfile2        = h5.File(self.infile2,'r')
+                    temp = self.infile1.split('/')[-1]
+                    self.patch2 = temp.split('_')[0]
+                else:
+                    raise TypeError
+        except TypeError:
+            print("Please provide second input map (must always be given if adding, co-adding or subtracting maps)!")
+            sys.exit()
+
+        try:
+            if not isinstance(self.outfile, str):
+                raise TypeError
+        except TypeError:        
+            print("Please provide outfile map (must always be given)!")
+            sys.exit()
+        
+        if self.add or self.subtract or self.coadd:
+            if self.infile2 == None:
+                print("To perform addition, subtraction or co-add maps a second input map must be provided with -I or --infile2 input!")
+                sys.exit()
+            if self.coadd:
+                self.tool = "coadd"
+            elif self.subtract:
+                self.tool = "subtract"
+            else:
+                self.tool = "add"
+
+        if (self.dgrade_list != None) or (self.ugrade_list != None) or(self.smooth_list != None):
+            if self.infile2 != None:
+                print("To perform dgrade, ugrade or smoothing no second input file is needed. Please omit -I or --infile2 input input!")
+    
+    def input_argv(self):
         """
         Function processing the command line input using getopt.
         """
@@ -74,19 +412,19 @@ class Atlas:
 
         try:
             opts, args = getopt.getopt(sys.argv[1:],"s:f:i:h:d:o:I:j:t:bF", ["sb=", "freq=", "infile1=", "help", "det=",
-                                                                            "out=","infile2=", "jk=", "tool=", "beam", "full"])
+                                                                            "out=","infile2=", "spl=", "tool=", "beam", "full"])
         except getopt.GetoptError:
             self.usage()
 
         for opt, arg in opts:
             
-            if opt in ("-j", "--jk"):
-                self.jack = True
-                self.jk = arg.split(",")
-                self.jk = list(self.jk)
-                for jk in self.jk:
-                    if jk not in self.jk_choices:
-                        print("Make sure you have chosen the correct jk choices")                                                                                                   
+            if opt in ("-j", "--spl"):
+                self.split = True
+                self.spl = arg.split(",")
+                self.spl = list(self.spl)
+                for spl in self.spl:
+                    if spl not in self.spl_choices:
+                        print("Make sure you have chosen the correct spl choices")                                                                                                   
                         sys.exit() 
             
             elif opt in ("-t", "--tool"):
@@ -340,11 +678,11 @@ class Atlas:
         m6 = "[(Which detector as a list, ie. [4,11,18]. Default all]"
         m7 = "[Outfile name, default 'outfile.h5']"
         m8 = "[Beam argument, if given operation is only performed on '_beam' datasets.]"
-        m8 += "[Default are beam, full and jackknives ]"
+        m8 += "[Default are beam, full and splits ]"
         m9 = "[If given performes operation only on full datasets (ie map, nhit and rms."
-        m9 += "Default are beam, full and jackknives]"
-        m10 = "[Jackknife mode to perform operation on. Choices are dayn, half, odde and sdlb." 
-        m10 += "Default are beam, full and jackknives]"
+        m9 += "Default are beam, full and splits]"
+        m10 = "[split mode to perform operation on. Choices are dayn, half, odde and sdlb." 
+        m10 += "Default are beam, full and splits]"
         m11 = "[Help which diplays this text]"
         
         print("\nThis is the usage function\n")
@@ -362,20 +700,20 @@ class Atlas:
         print("-t ----> optional --tool......" + wrapper.fill(m3))
         print("-b ----> optional --beam......" + wrapper.fill(m8))
         print("-F ----> optional --full......" + wrapper.fill(m9))
-        print("-j ----> optional --jk........" + wrapper.fill(m10))
+        print("-j ----> optional --spl........" + wrapper.fill(m10))
         print("-h ----> optional --help......" + wrapper.fill(m11))
         sys.exit()
 
-    def readMap(self, first_file = True, jackmode = None):
+    def readMap(self, first_file = True, splitmode = None):
         """
-        Function reading an input file and returns map, nhit and rms (for beam, full or jackknife) datasets.
+        Function reading an input file and returns map, nhit and rms (for beam, full or split) datasets.
         
         Parameters:
         ------------------------------
         first_infile: bool
             If true the data is read from the first input file, else the second input file is read.
-        jackkmode: str
-            A string containing the name of the chosen jackknife name; dayn, half, odde or sdlb.
+        splitkmode: str
+            A string containing the name of the chosen split name; dayn, half, odde or sdlb.
         ------------------------------
         Returns:
             map: numpy.ndarray
@@ -397,16 +735,16 @@ class Atlas:
         sb_start = self.sb_list[0] - 1
         sb_end   = self.sb_list[-1] - 1
         
-        if jackmode != None:
-            """Reading jackknife datasets"""
-            if jackmode == "dayn" or jackmode == "half":
-                map  =  dfile["jackknives/map_" + jackmode][:, self.det_list - 1, sb_start:sb_end + 1, freq_start:freq_end + 1, ...]
-                nhit =  dfile["jackknives/nhit_" + jackmode][:, self.det_list - 1, sb_start:sb_end + 1, freq_start:freq_end + 1, ...]
-                rms  =  dfile["jackknives/rms_" + jackmode][:, self.det_list - 1, sb_start:sb_end + 1, freq_start:freq_end + 1, ...]
+        if splitmode != None:
+            """Reading split datasets"""
+            if splitmode == "dayn" or splitmode == "half":
+                map  =  dfile["splits/map_" + splitmode][:, self.det_list - 1, sb_start:sb_end + 1, freq_start:freq_end + 1, ...]
+                nhit =  dfile["splits/nhit_" + splitmode][:, self.det_list - 1, sb_start:sb_end + 1, freq_start:freq_end + 1, ...]
+                rms  =  dfile["splits/rms_" + splitmode][:, self.det_list - 1, sb_start:sb_end + 1, freq_start:freq_end + 1, ...]
             else: 
-                map  =  dfile["jackknives/map_" + jackmode][:, sb_start:sb_end + 1, freq_start:freq_end + 1, ...]
-                nhit =  dfile["jackknives/nhit_" + jackmode][:, sb_start:sb_end + 1, freq_start:freq_end + 1, ...]
-                rms  =  dfile["jackknives/rms_" + jackmode][:, sb_start:sb_end + 1, freq_start:freq_end + 1, ...]
+                map  =  dfile["splits/map_" + splitmode][:, sb_start:sb_end + 1, freq_start:freq_end + 1, ...]
+                nhit =  dfile["splits/nhit_" + splitmode][:, sb_start:sb_end + 1, freq_start:freq_end + 1, ...]
+                rms  =  dfile["splits/rms_" + splitmode][:, sb_start:sb_end + 1, freq_start:freq_end + 1, ...]
         else:
             if self.beam:
                 """Reading beam dataset"""
@@ -428,29 +766,29 @@ class Atlas:
 
         return map, nhit, rms
         
-    def writeMap(self, jackmode = None, write_the_rest = False):
+    def writeMap(self, splitmode = None, write_the_rest = False):
         """
         Function that saves self.map, self.nhit and self.rms class attributes are saved 
         to output file. 
 
         Parameters:
         ------------------------------
-        jackkmode: str
-            A string containing the name of the chosen jackknife name; dayn, half, odde or sdlb.
+        splitkmode: str
+            A string containing the name of the chosen split name; dayn, half, odde or sdlb.
         write_the_rest: bool
             If true all the other datasets and attributes from the first input file are 
             (possibly modified accordingly and) copied to outfile.
         ------------------------------
         """
 
-        if (jackmode != None )and not write_the_rest:
+        if (splitmode != None )and not write_the_rest:
             """
-            Generating dataset names and writing jackknives 
+            Generating dataset names and writing splits 
             datasets to outfile.
             """
-            map_name    = "jackknives/map_" + jackmode
-            nhit_name   = "jackknives/nhit_" + jackmode
-            rms_name    = "jackknives/rms_" + jackmode
+            map_name    = "splits/map_" + splitmode
+            nhit_name   = "splits/nhit_" + splitmode
+            rms_name    = "splits/rms_" + splitmode
             
             self.ofile.create_dataset(map_name, data = self.map)
             self.ofile.create_dataset(nhit_name, data = self.nhit)
@@ -485,15 +823,15 @@ class Atlas:
                 """Things not to copy because they are already copied or will be copied at different time""" 
                 
                 if "map_beam" in self.dfile1.keys():
-                    data_not_to_copy = ["jackknives", "map", "map_beam", "nhit", 
+                    data_not_to_copy = ["splits", "map", "map_beam", "nhit", 
                                         "nhit_beam", "rms", "rms_beam"]
                 
                 elif "map_coadd" in self.dfile1.keys():
-                    data_not_to_copy = ["jackknives", "map", "map_coadd", "nhit", 
+                    data_not_to_copy = ["splits", "map", "map_coadd", "nhit", 
                                         "nhit_coadd", "rms", "rms_coadd"]
                 
                 
-                jk_data_not_to_copy = ["map_dayn",  "map_half",  "map_odde",  "map_sdlb",
+                spl_data_not_to_copy = ["map_dayn",  "map_half",  "map_odde",  "map_sdlb",
                                        "nhit_dayn", "nhit_half", "nhit_odde", "nhit_sdlb",
                                        "rms_dayn",  "rms_half",  "rms_odde",  "rms_sdlb"]
                 """Looping through and copying over"""                      
@@ -501,11 +839,11 @@ class Atlas:
                     if name not in self.ofile.keys() and name not in data_not_to_copy:
                         self.ofile.create_dataset(name, data = self.dfile1[name])    
                 
-                    if "jackknives" in self.dfile1 and "jackknives" in self.dfile2 and "jackknives" in self.ofile:
-                        for name in self.dfile1["jackknives"].keys():
-                            if name not in self.ofile["jackknives"].keys() and name not in jk_data_not_to_copy:
-                                self.ofile.create_dataset("jackknives/" + name, 
-                                                            data = self.dfile1["jackknives/" + name])   
+                    if "splits" in self.dfile1 and "splits" in self.dfile2 and "splits" in self.ofile:
+                        for name in self.dfile1["splits"].keys():
+                            if name not in self.ofile["splits"].keys() and name not in spl_data_not_to_copy:
+                                self.ofile.create_dataset("splits/" + name, 
+                                                            data = self.dfile1["splits/" + name])   
             else:   
                 if self.tool == "dgradeXY" or self.tool == "ugradeXY":
                     self.merge_numZ = 1
@@ -600,27 +938,27 @@ class Atlas:
 
                 """Copying over the remainder of the other datasets not yet copied"""
                 if "map_beam" in self.dfile1.keys():
-                    data_not_to_copy = ["jackknives", "map", "map_beam", "nhit", 
+                    data_not_to_copy = ["splits", "map", "map_beam", "nhit", 
                                         "nhit_beam", "rms", "rms_beam",
                                         "x", "y", "n_x", "n_y", "nside", "freq"]
 
                 elif "map_coadd" in self.dfile1.keys():
-                    data_not_to_copy = ["jackknives", "map", "map_coadd", "nhit", 
+                    data_not_to_copy = ["splits", "map", "map_coadd", "nhit", 
                                         "nhit_coadd", "rms", "rms_coadd",
                                         "x", "y", "n_x", "n_y", "nside", "freq"]
 
-                jk_data_not_to_copy = ["map_dayn",  "map_half",  "map_odde",  "map_sdlb",
+                spl_data_not_to_copy = ["map_dayn",  "map_half",  "map_odde",  "map_sdlb",
                                        "nhit_dayn", "nhit_half", "nhit_odde", "nhit_sdlb",
                                        "rms_dayn",  "rms_half",  "rms_odde",  "rms_sdlb"]
                 for name in self.dfile1.keys():
                     if name not in self.ofile.keys() and name not in data_not_to_copy:
                         self.ofile.create_dataset(name, data = self.dfile1[name])    
                 
-                    if "jackknives" in self.dfile1 and "jackknives" in self.ofile:
-                        for name in self.dfile1["jackknives"].keys():
-                            if name not in self.ofile["jackknives"].keys() and name not in jk_data_not_to_copy:
-                                self.ofile.create_dataset("jackknives/" + name, 
-                                                            data = self.dfile1["jackknives/" + name])   
+                    if "splits" in self.dfile1 and "splits" in self.ofile:
+                        for name in self.dfile1["splits"].keys():
+                            if name not in self.ofile["splits"].keys() and name not in spl_data_not_to_copy:
+                                self.ofile.create_dataset("splits/" + name, 
+                                                            data = self.dfile1["splits/" + name])   
             
     def operation(self):  
         """
@@ -630,10 +968,10 @@ class Atlas:
         if self.infile1 != None and self.infile2 != None:
             """Operations of two infiles"""
             if self.everything:
-                if "jackknives" in self.dfile1 and "jackknives" in self.dfile2:
-                    for jack in self.jk:
-                        self.map1, self.nhit1, self.rms1 = self.readMap(True, jack)
-                        self.map2, self.nhit2, self.rms2 = self.readMap(False, jack)
+                if "splits" in self.dfile1 and "splits" in self.dfile2:
+                    for split in self.spl:
+                        self.map1, self.nhit1, self.rms1 = self.readMap(True, split)
+                        self.map2, self.nhit2, self.rms2 = self.readMap(False, split)
                         
                         if self.tool == "coadd":
                             if len(self.map1.shape) == 6:
@@ -660,7 +998,8 @@ class Atlas:
                             if len(self.map1.shape) == 5:
                                 self.C_add5D(self.map1, self.nhit1, self.rms1,
                                              self.map2, self.nhit2, self.rms2) 
-                        self.writeMap(jack)
+                        if self.save_outmap:
+                            self.writeMap(split)
                 
                 self.full = True
                 self.map1, self.nhit1, self.rms1 = self.readMap(True)
@@ -676,7 +1015,8 @@ class Atlas:
                 elif self.tool == "add": 
                     self.C_add5D(self.map1, self.nhit1, self.rms1,
                                  self.map2, self.nhit2, self.rms2)
-                self.writeMap()
+                if self.save_outmap:
+                    self.writeMap()
                 
                 self.full = False
                 self.beam = True
@@ -695,13 +1035,14 @@ class Atlas:
                     self.C_add4D(self.map1, self.nhit1, self.rms1,
                                 self.map2, self.nhit2, self.rms2)  
 
-                self.writeMap()
+                if self.save_outmap:
+                    self.writeMap()
                 self.beam = False
             
-            if self.jack:
-                for jack in self.jk:
-                    self.map1, self.nhit1, self.rms1 = self.readMap(True, jack)
-                    self.map2, self.nhit2, self.rms2 = self.readMap(False, jack)
+            if self.split:
+                for split in self.spl:
+                    self.map1, self.nhit1, self.rms1 = self.readMap(True, split)
+                    self.map2, self.nhit2, self.rms2 = self.readMap(False, split)
                     
                     if self.tool == "coadd":
                         if len(self.map1.shape) == 6:
@@ -729,7 +1070,8 @@ class Atlas:
                             if len(self.map1.shape) == 5:
                                 self.C_add5D(self.map1, self.nhit1, self.rms1,
                                             self.map2, self.nhit2, self.rms2) 
-                    self.writeMap(jack)
+                    if self.save_outmap:
+                        self.writeMap(split)
 
             if self.full:
                 _beam = self.beam
@@ -748,7 +1090,8 @@ class Atlas:
                     self.C_add5D(self.map1, self.nhit1, self.rms1,
                                 self.map2, self.nhit2, self.rms2)  
 
-                self.writeMap()
+                if self.save_outmap:
+                    self.writeMap()
                 self.beam = _beam
         
             if self.beam:
@@ -768,16 +1111,18 @@ class Atlas:
                     self.C_add4D(self.map1, self.nhit1, self.rms1,
                                 self.map2, self.nhit2, self.rms2)
 
-                self.writeMap()
+                if self.save_outmap:
+                    self.writeMap()
                 self.full = _full
-            self.writeMap(write_the_rest = True)
+            if self.save_outmap:
+                self.writeMap(write_the_rest = True)
 
         if self.infile1 != None and self.infile2 == None:
             """Operations to perform on single input file"""
             if self.everything:
-                if "jackknives" in self.dfile1:
-                    for jack in self.jk:
-                        self.map1, self.nhit1, self.rms1 = self.readMap(True, jack)
+                if "splits" in self.dfile1:
+                    for split in self.spl:
+                        self.map1, self.nhit1, self.rms1 = self.readMap(True, split)
                         if self.tool == "dgradeXY":
                             if len(self.map1.shape) == 6:
                                 self.C_dgradeXY6D(self.map1, self.nhit1, self.rms1)
@@ -828,8 +1173,9 @@ class Atlas:
                         
                         elif self.tool == "smoothXYZ":
                             self.gaussian_smoothXYZ(self.map1, self.nhit1, self.rms1)
-
-                        self.writeMap(jack)
+                        
+                        if self.save_outmap:
+                            self.writeMap(split)
 
                 self.full = True
                 self.map1, self.nhit1, self.rms1 = self.readMap(True)
@@ -861,7 +1207,9 @@ class Atlas:
                 elif self.tool == "smoothXYZ":
                     self.gaussian_smoothXYZ(self.map1, self.nhit1, self.rms1)
 
-                self.writeMap()
+                if self.save_outmap:
+
+                    self.writeMap()
                 
                 self.full = False
                 self.beam = True
@@ -894,12 +1242,13 @@ class Atlas:
                 elif self.tool == "smoothXYZ":
                     self.gaussian_smoothXYZ(self.map1, self.nhit1, self.rms1)
 
-                self.writeMap()
+                if self.save_outmap:
+                    self.writeMap()
                 self.beam = False
 
-            if self.jack:
-                for jack in self.jk:
-                    self.map1, self.nhit1, self.rms1 = self.readMap(True, jack)
+            if self.split:
+                for split in self.spl:
+                    self.map1, self.nhit1, self.rms1 = self.readMap(True, split)
                     if self.tool == "dgradeXY":
                         if len(self.map1.shape) == 6:
                             self.C_dgradeXY6D(self.map1, self.nhit1, self.rms1)
@@ -951,7 +1300,8 @@ class Atlas:
                     elif self.tool == "smoothXYZ":
                         self.gaussian_smoothXYZ(self.map1, self.nhit1, self.rms1)
 
-                    self.writeMap(jack)
+                    if self.save_outmap:
+                        self.writeMap(split)
 
             if self.full:
                 _beam = self.beam
@@ -985,7 +1335,8 @@ class Atlas:
                 elif self.tool == "smoothXYZ":
                     self.gaussian_smoothXYZ(self.map1, self.nhit1, self.rms1)
 
-                self.writeMap()
+                if self.save_outmap:
+                    self.writeMap()
                 self.beam = _beam
         
             if self.beam:
@@ -1020,9 +1371,11 @@ class Atlas:
                 elif self.tool == "smoothXYZ":
                     self.gaussian_smoothXYZ(self.map1, self.nhit1, self.rms1)
                 
-                self.writeMap()
+                if self.save_outmap:
+                    self.writeMap()
                 self.full = _full
-            self.writeMap(write_the_rest = True)            
+            if self.save_outmap:
+               self.writeMap(write_the_rest = True)            
 
 
 

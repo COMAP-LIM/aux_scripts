@@ -172,7 +172,7 @@ class COMAP2PNG:
 
 
         self.num_feeds, self.num_bands, self.num_freqs, self.nx, self.ny = self.map_full.shape
-
+        
     def make_maps(self):
         
         map_full, rms_full, hit_full = self.map_full, self.rms_full, self.hit_full

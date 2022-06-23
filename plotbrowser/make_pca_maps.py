@@ -57,15 +57,19 @@ parser.add_argument("-p", "--outpath", type = str,
 
 args = parser.parse_args()
 
-if args.param == None:
-    message = """No input parameterfile given, please provide an input parameterfile"""
-    raise NameError(message)
-else:
+try:
     mappath     = args.inpath
     outpath     = args.outpath
     inname     = args.inname
     outname     = args.outname
+except:
+    message = """No input parameterfile given, please provide an input parameterfile"""
+    raise NameError(message)
 
+print(mappath)
+print(outpath)
+print(inname)
+print(outname)
 
 mapeditor = Atlas(no_init = True)
 
