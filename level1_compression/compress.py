@@ -107,40 +107,45 @@ class Compress:
 
     def compress_file(self, file_index):
         #### Compression function for single file, which will be run by each thread. A unique file index is provided by the Pool.map func. ####
-        t00 = time.time()
         filename = self.filenames[file_index]
         comp_filename = "comp_" + filename
         raw_filepath = path + filename  # Filepath of old uncompressed file.
         temp_filepath1 = RAMDISK_PATH + filename  # Uncompressed filepath of ram-disk (used for temporary storage while compressing).
         temp_filepath2 = RAMDISK_PATH + comp_filename  # Compressed filepath on ram-disk.
         comp_filepath = path + comp_filename  # Compressed filepath, back at original location.
-        if os.path.getsize(raw_filepath) > 0:
-            # Copy original file to ram-disk:
-            command = "cp %s %s" % (raw_filepath, temp_filepath1)
-            exitstatus = os.system(command)
-            if exitstatus == 0:
-                # Shuffle and compress file, writing to new file on ram-disk:
-                command = "h5repack -f /spectrometer/tod:SHUF -f /spectrometer/tod:GZIP=3 -l /spectrometer/tod:CHUNK=1x4x1024x4000 %s %s" % (temp_filepath1, temp_filepath2)
+        if not os.path.isfile(comp_filepath):  # Check if there already is a compressed file in the final location.
+            logging.info(f"Starting file {raw_filepath} at size {os.path.getsize(raw_filepath)}.")
+            t00 = time.time()
+            if os.path.getsize(raw_filepath) > 0:
+                # Copy original file to ram-disk:
+                command = "cp %s %s" % (raw_filepath, temp_filepath1)
+                exitstatus = os.system(command)
+                if exitstatus == 0:
+                    # Shuffle and compress file, writing to new file on ram-disk:
+                    command = "h5repack -f /spectrometer/tod:SHUF -f /spectrometer/tod:GZIP=3 -l /spectrometer/tod:CHUNK=1x4x1024x4000 %s %s" % (temp_filepath1, temp_filepath2)
+                    exitstatus += os.system(command)
+                # Delete uncompressed file from ram-disk:
+                command = "rm %s" % (temp_filepath1)
                 exitstatus += os.system(command)
-            # Delete uncompressed file from ram-disk:
-            command = "rm %s" % (temp_filepath1)
-            exitstatus += os.system(command)
-            if exitstatus == 0:
-                # Move compressed file from ram-disk back to original location:
-                command = "mv %s %s" % (temp_filepath2, comp_filepath)
-                exitstatus += os.system(command)
+                if exitstatus == 0:
+                    # Move compressed file from ram-disk back to original location:
+                    command = "mv %s %s" % (temp_filepath2, comp_filepath)
+                    exitstatus += os.system(command)
+            else:
+                # Emtpy file. Just copy it.
+                command = "cp %s %s" % (raw_filepath, comp_filepath)
+                exitstatus = os.system(command)
+            t01 = time.time()
+            if exitstatus != 0:
+                logging.error("h5repack ON FILE %s FINISHED WITH NON-ZERO EXIT STATUS %d." % (comp_filepath, exitstatus))
+            minutes_spent = (t01-t00)/60.0
+            raw_size = os.path.getsize(raw_filepath)
+            comp_size = os.path.getsize(comp_filepath)
+            logging.info("Finished file %s (%d/%d)  oldsize=%.2fGB  newsize=%.2fGB  ratio=%.2f  time spent=%.1fm" % (raw_filepath, file_index+1, len(self.filenames), raw_size*1e-9, comp_size*1e-9, raw_size/max(1, comp_size), minutes_spent))
+
         else:
-            # Emtpy file. Just copy it.
-            command = "cp %s %s" % (raw_filepath, comp_filepath)
-            exitstatus = os.system(command)
-        t01 = time.time()
-        if exitstatus != 0:
-            logging.error("h5repack ON FILE %s FINISHED WITH NON-ZERO EXIT STATUS %d." % (comp_filepath, exitstatus))
+            logging.info(f"Skipping already compressed file {comp_filepath}.")
         
-        minutes_spent = (t01-t00)/60.0
-        raw_size = os.path.getsize(raw_filepath)
-        comp_size = os.path.getsize(comp_filepath)
-        logging.info("Finished file %s (%d/%d)  oldsize=%.2fGB  newsize=%.2fGB  ratio=%.2f  time spent=%.1fm" % (raw_filepath, file_index+1, len(self.filenames), raw_size*1e-9, comp_size*1e-9, raw_size/max(1, comp_size), minutes_spent))
 
 
 
