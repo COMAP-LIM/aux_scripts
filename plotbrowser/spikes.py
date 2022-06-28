@@ -1,4 +1,4 @@
-import numpy 
+import numpy as np
 
 class spike_data():
     def __init__(self):

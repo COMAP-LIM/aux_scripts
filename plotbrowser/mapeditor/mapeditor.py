@@ -16,37 +16,10 @@ class Atlas:
         """
         Initiating Atlas class and setting class attributes and default command line arguments
         """
-<<<<<<< HEAD
-        self.jk_choices   = ["odde", "dayn", "half", "sdlb", "sidr"]    # Possible choices of jackknife modes.
-        self.jk           = None                                        # If no jackknife argument is given self.jk will be None.
-        self.jack         = False                                       # If ture operations are performed on jackknives, changes to 
-                                                                        #true if jackknife command line input is given.
-
-        self.tool_choices   = ["coadd", "subtract", "add", "dgradeXY", "dgradeZ", "dgradeXYZ",
-                                                           "ugradeXY", "ugradeZ", "ugradeXYZ",
-                                                           "smoothXY", "smoothZ", "smoothXYZ"]     # Tool choices.
-        self.tool         = None               # Default tool is coadd.
-        self.det_list     = np.arange(1,20)         # List of detectors to use, default all.
-        self.sb_list      = np.arange(1,5)          # List of sidebands to use, default all.
-        self.freq_list    = np.arange(1,65)         # List of frequency channels per sideband, default all.
-        self.outfile      = "outfile.h5"            # Output file name.
-        self.n_sigma      = 5                       # Default n_sigma; used for defining the Gaussian smoothing kernel's grid.
-
-        self.beam        = False    # If true subsequent operations are only performed on _beam dataset.
-        self.full        = False    # If true subsequent operations are only performed on full dataset.
-        self.everything  = False    # If true full, beam and jackknive datasets are all processed.
-        self.patch1       = ''      # Patch name of first infile.
-        self.patch2       = ''      # Patch name of second infile.
-        self.infile1      = None    # Fist infile name.
-        self.infile2      = None    # Second infile name.
         self.maputilslib = ctypes.cdll.LoadLibrary("/mn/stornext/d22/cmbco/comap/d16/protodir/auxiliary/maputilslib.so.1")  # Load shared C utils library.
-        #self.maputilslib = ctypes.cdll.LoadLibrary("maputilslib.so.1")  # Load shared C utils library.
 
-        self.input()    # Calling the input function to set variables dependent on command line input.
-=======
         if not no_init:
             self.save_outmap = save_outmap
->>>>>>> 9fec3c88050fafe953e510ce96a61332d0d2a465
 
             self.add = add
             self.subtract = subtract
@@ -81,7 +54,6 @@ class Atlas:
             self.patch2       = ''      # Patch name of second infile.
             self.infile1      = infile1    # Fist infile name.
             self.infile2      = infile2    # Second infile name.
-            self.maputilslib = ctypes.cdll.LoadLibrary("/mn/stornext/d16/cmbco/comap/protodir/auxiliary/maputilslib.so.1")  # Load shared C utils library.
             #self.maputilslib = ctypes.cdll.LoadLibrary("maputilslib.so.1")  # Load shared C utils library.
 
             if terminal_mode:
@@ -781,7 +753,7 @@ class Atlas:
         ------------------------------
         """
 
-        if (splitmode != None )and not write_the_rest:
+        if (splitmode != None ) and not write_the_rest:
             """
             Generating dataset names and writing splits 
             datasets to outfile.
@@ -823,11 +795,11 @@ class Atlas:
                 """Things not to copy because they are already copied or will be copied at different time""" 
                 
                 if "map_beam" in self.dfile1.keys():
-                    data_not_to_copy = ["splits", "map", "map_beam", "nhit", 
+                    data_not_to_copy = ["splits", "multisplits", "map", "map_beam", "nhit", 
                                         "nhit_beam", "rms", "rms_beam"]
                 
                 elif "map_coadd" in self.dfile1.keys():
-                    data_not_to_copy = ["splits", "map", "map_coadd", "nhit", 
+                    data_not_to_copy = ["splits", "multisplits", "map", "map_coadd", "nhit", 
                                         "nhit_coadd", "rms", "rms_coadd"]
                 
                 
@@ -1926,7 +1898,7 @@ class Atlas:
         self.map = np.zeros( (n0, n1, N2, n3, n4), dtype = ctypes.c_float)  # Generating arrays to fill up with coadded data.
         self.nhit = np.zeros((n0, n1, N2, n3, n4), dtype = ctypes.c_int)
         self.rms = np.zeros( (n0, n1, N2, n3, n4), dtype = ctypes.c_float)
-        print(map_h.dtype, nhit_h.dtype, rms_h.dtype)
+
         self.maputilslib.dgradeZ5D(map_h,    nhit_h,     rms_h,     # Filling self.map, self.nhit and self.rms by
                                   self.map, self.nhit,  self.rms,   # call-by-pointer to C library.
                                   n0,       n1,         n2,
@@ -2662,51 +2634,7 @@ if __name__ == "__main__":
     t = time.time()
     map = Atlas()
     print("Run time: ", time.time() - t, " sec")
-    """
-    dummy_map = np.zeros((1,2,2,2), dtype = np.float32)
-    dummy_nhit = np.zeros((1,2,2,2), dtype = np.int32)
-    dummy_rms = np.zeros((1,2,2,2), dtype  = np.float32)
-
-    dummy_map[0, 0, :, :] = 0
-    dummy_map[0, 1, 1, :] = 0
-    dummy_map[0, 1, 0, 0] = 1
-    dummy_map[0, 1, 0, 1] = 1
-
-    dummy_nhit[0, 0, :, :] = 0
-    dummy_nhit[0, 1, 1, :] = 0
-    dummy_nhit[0, 1, 0, 0] = 2
-    dummy_nhit[0, 1, 0, 1] = 1
-
-    dummy_rms[0, 0, :, :] = 0
-    dummy_rms[0, 1, 1, :] = 0
-    dummy_rms[0, 1, 0, 0] = 1 / np.sqrt(2)
-    dummy_rms[0, 1, 0, 1] = 1   
     
-    map.C_dgradeXY4D(dummy_map, dummy_nhit, dummy_rms)
-    print("map")
-    print(dummy_map[0, 0, :, :])
-    print(dummy_map[0, 1, :, :])
-    print("nhit")
-
-    print(dummy_nhit[0, 0, :, :])
-    print(dummy_nhit[0, 1, :, :])
-    print("rms")
-
-    print(dummy_rms[0, 0, :, :])
-    print(dummy_rms[0, 1, :, :])
-
-    print("map")
-    print(map.map[0, 0, :, :])
-    print(map.map[0, 1, :, :])
-
-    print("nhit")
-    print(map.nhit[0, 0, :, :])
-    print(map.nhit[0, 1, :, :])
-
-    print("rms")
-    print(map.rms[0, 0, :, :])
-    print(map.rms[0, 1, :, :])
-    """
 
 
 
