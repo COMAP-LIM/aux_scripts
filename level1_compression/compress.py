@@ -66,7 +66,7 @@ class Compress:
         logging.info("Compressing %d files with %d threads in dir %s." % (len(filenames), nr_threads, path))
         t0 = time.time()
         with Pool(nr_threads) as p:
-            p.map(self.compress_file, range(len(filenames)))
+            p.map(self.compress_file, range(len(filenames)), chunksize=1)
         t1 = time.time()
         for filename in self.filenames:
             raw_filepath = path + filename
@@ -114,7 +114,7 @@ class Compress:
         temp_filepath2 = RAMDISK_PATH + comp_filename  # Compressed filepath on ram-disk.
         comp_filepath = path + comp_filename  # Compressed filepath, back at original location.
         if not os.path.isfile(comp_filepath):  # Check if there already is a compressed file in the final location.
-            logging.info(f"Starting file {raw_filepath} at size {os.path.getsize(raw_filepath)}.")
+            logging.info(f"Starting file {raw_filepath} at size {os.path.getsize(raw_filepath)*1e-9:.1f}GB.")
             t00 = time.time()
             if os.path.getsize(raw_filepath) > 0:
                 # Copy original file to ram-disk:
