@@ -118,16 +118,19 @@ class Compress:
             # Copy original file to ram-disk:
             command = "cp %s %s" % (raw_filepath, temp_filepath1)
             exitstatus = os.system(command)
-            # Shuffle and compress file, writing to new file on ram-disk:
-            command = "h5repack -f /spectrometer/tod:SHUF -f /spectrometer/tod:GZIP=3 -l /spectrometer/tod:CHUNK=1x4x1024x4000 %s %s" % (temp_filepath1, temp_filepath2)
-            exitstatus += os.system(command)
+            if exitstatus == 0:
+                # Shuffle and compress file, writing to new file on ram-disk:
+                command = "h5repack -f /spectrometer/tod:SHUF -f /spectrometer/tod:GZIP=3 -l /spectrometer/tod:CHUNK=1x4x1024x4000 %s %s" % (temp_filepath1, temp_filepath2)
+                exitstatus += os.system(command)
             # Delete uncompressed file from ram-disk:
             command = "rm %s" % (temp_filepath1)
             exitstatus += os.system(command)
-            # Move compressed file from ram-disk back to original location:
-            command = "mv %s %s" % (temp_filepath2, comp_filepath)
-            exitstatus += os.system(command)
+            if exitstatus == 0:
+                # Move compressed file from ram-disk back to original location:
+                command = "mv %s %s" % (temp_filepath2, comp_filepath)
+                exitstatus += os.system(command)
         else:
+            # Emtpy file. Just copy it.
             command = "cp %s %s" % (raw_filepath, comp_filepath)
             exitstatus = os.system(command)
         t01 = time.time()
