@@ -138,6 +138,11 @@ class Compress:
             t01 = time.time()
             if exitstatus != 0:
                 logging.error("h5repack ON FILE %s FINISHED WITH NON-ZERO EXIT STATUS %d." % (comp_filepath, exitstatus))
+                # Corrupt file. Just copy it.
+                command = "cp %s %s" % (raw_filepath, comp_filepath)
+                exitstatus = os.system(command)
+                if exitstatus != 0:
+                    logging.error("COPY OF CORRUPT FILE %s FAILED!" % raw_filepath)
             minutes_spent = (t01-t00)/60.0
             raw_size = os.path.getsize(raw_filepath)
             comp_size = os.path.getsize(comp_filepath)
