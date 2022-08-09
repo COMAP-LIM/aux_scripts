@@ -44,7 +44,7 @@ def worker(fileidx):
         tsys[feeds-1] = Tsys.Tsys
         G = np.zeros((20, 4, 1024))
         G[feeds-1] = Tsys.G
-        calib_indices_tod = Tsys.calib_indices_tod
+        calib_indices_tod = Tsys.calib_startstopindices_tod
  
     except:
         print(f"Tsys failed for {obsid}.")
