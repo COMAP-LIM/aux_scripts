@@ -2,17 +2,13 @@
 python3 -W ignore tsys_database_write_new.py -o -n 28 -p level1_database_files -m 2019-10 2019-09 2019-08
 """
 import numpy as np
-import matplotlib.pyplot as plt
 import h5py
 from os import listdir, makedirs
 from os.path import isfile, join, exists
-from tqdm import tqdm
-import matplotlib
 import time
-from tqdm import trange
+from tqdm import trange, tqdm
 from tsysmeasure import TsysMeasure
 import multiprocessing as mp
-import sys
 import argparse
 
 
@@ -28,9 +24,7 @@ def worker(fileidx):
     try:
         Tsys = TsysMeasure()
         Tsys.load_data_from_file(filename)
-        Ntod = Tsys.tod.shape[-1]
         Tsys.solve()
-        Tsys.Tsys_single()
         feeds = Tsys.feeds
         Thot = np.zeros((20, 2))
         Thot[feeds-1] = Tsys.Thot
@@ -45,28 +39,16 @@ def worker(fileidx):
         calib_times = np.zeros((20, 2))
         calib_times[feeds-1] = Tsys.calib_times
         calib_startstop_times = np.zeros((20, 2, 2))
-        calib_startstop_times[feeds-1] = Tsys.Phot_startstop_times
+        calib_startstop_times[feeds-1] = Tsys.calib_startstop_times
         tsys = np.zeros((20, 4, 1024))
         tsys[feeds-1] = Tsys.Tsys
+        G = np.zeros((20, 4, 1024))
+        G[feeds-1] = Tsys.G
         calib_indices_tod = Tsys.calib_indices_tod
-        #freqs = Tsys.freqs
-        
-        # TOD_sbmean = np.zeros((20, 4, Tsys.calib_indices_tod[1,0]-Tsys.calib_indices_tod[0,1]))
-        # for i in range(len(feeds)):
-        #     feed = feeds[i]
-        #     if feed < 20:
-        #         try:
-        #             TOD_Kelvin = Tsys.tod[i,:,:,Tsys.calib_indices_tod[0,1]:Tsys.calib_indices_tod[1,0]]
-        #             TOD_Kelvin /= Tsys.G[i,:,:,None]
-        #             TOD_Kelvin[~(TOD_Kelvin > 20)*(TOD_Kelvin < 80)] = np.nan
-        #             TOD_var = np.nanvar(TOD_Kelvin[:,:,1:] - TOD_Kelvin[:,:,:-1], axis=-1)
-        #             TOD_sbmean[feed-1] = np.nansum(TOD_Kelvin/TOD_var[:,:,None], axis=1)*1.0/np.nansum(1.0/TOD_var, axis=1)[:,None]
-        #         except:
-        #             pass
-        # TOD_sbmean[TOD_sbmean == 0] = np.nan
-
+ 
     except:
         print(f"Tsys failed for {obsid}.")
+        feeds = np.zeros(0)
         Thot = np.zeros((20, 2)) + np.nan
         Phot = np.zeros((20, 4, 1024, 2)) + np.nan
         points_used_Thot = np.zeros((20, 2), dtype=int) 
@@ -75,26 +57,22 @@ def worker(fileidx):
         calib_times = np.zeros((20, 2)) + np.nan
         calib_startstop_times = np.zeros((20, 2, 2)) + np.nan
         tsys = np.zeros((20, 4, 1024)) + np.nan
+        G = np.zeros((20, 4, 1024)) + np.nan
         calib_indices_tod = np.zeros_like((2, 2)) + np.nan
-        # TOD_sbmean = np.zeros((20, 4, 1)) + np.nan
 
     
     with h5py.File(f"{args.path}/{obsid}.h5", "w") as outfile:
+        outfile.create_dataset("feeds", data=feeds)
         outfile.create_dataset("Thot", data=Thot)
         outfile.create_dataset("Phot", data=Phot)
-        #outfile.create_dataset("Thot_mean", data=Tsys.Thot_mean)
-        #outfile.create_dataset("Thot_std", data=Tsys.Thot_std)
-        #outfile.create_dataset("Thot_span", data=Tsys.Thot_span)
         outfile.create_dataset("points_used_Thot", data=points_used_Thot)
         outfile.create_dataset("points_used_Phot", data=points_used_Phot)
-        outfile.create_dataset("Tsys_obsidmean", data=tsys)
         outfile.create_dataset("successful", data=successful)
         outfile.create_dataset("calib_times", data=calib_times)
         outfile.create_dataset("calib_startstop_times", data=calib_startstop_times)
-        # outfile.create_dataset("frequencies", data=freqs)
         outfile.create_dataset("calib_indices_tod", data=calib_indices_tod)
-        # outfile.create_dataset("tod_sbmean", data=TOD_sbmean)
-        #outfile.create_dataset("tod_wn_std", data=Tsys.tod_wn_std)
+        outfile.create_dataset("Tsys_obsidmean", data=tsys)
+        outfile.create_dataset("G_obsidmean", data=G)
     del(Tsys)
     
     print(f"Obsid {obsid} finished in {time.time()-t0:.2f} seconds.")
@@ -106,7 +84,6 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--path", type=str, default="level1_database_files", help="Path where the database files will be written.")
     parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite database files, if they already exist.")
     args = parser.parse_args()
-    #Nthreads = int(sys.argv[1])
     Nthreads = args.nthreads
     if not exists(args.path):
         makedirs(args.path)
@@ -115,7 +92,7 @@ if __name__ == "__main__":
     for month in args.months:
         months.append(month)
     blacklist = []
-    if not args.overwrite:/mn/stornext/d22/cmbco/comap/protodir/level1/2021-11/
+    if not args.overwrite:
         print(f"Creating list of already existing files...")
         for f in tqdm(listdir(args.path)):
             if isfile(join(args.path, f)):
