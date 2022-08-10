@@ -127,7 +127,7 @@ class TsysMeasure:
                                     self.Phot_unc[feed_idx, :, :, i] = np.nanstd(todi[:,:,min_idxi:max_idxi], axis=(2))/np.sqrt(max_idxi-min_idxi)
                                     self.points_used_Phot[feed_idx, i] = max_idxi - min_idxi
                                     self.calib_startstop_times[feed_idx, i] = (tod_timesi[min_idxi], tod_timesi[max_idxi])
-                                    self.calib_times[feed_idx, i] = (tod_timesi[max_idxi] - tod_timesi[min_idxi])/2
+                                    self.calib_times[feed_idx, i] = (tod_timesi[max_idxi] + tod_timesi[min_idxi])/2
                                     if np.isfinite(self.Thot[feed_idx, i]):
                                         if np.isfinite(self.Phot[feed_idx, :, :, i]).all():
                                             self.successful[feed_idx, i] = 1
