@@ -2,6 +2,11 @@ import requests as rs
 import csv
 import numpy as np
 
+# "Reasons" (from the google sheet) which OVRO lists as fine, but we want to remove:
+additional_blacklists = ["New firmware, old clock 2.00 GHz, details in the pathfinder log",
+                         "New firmware, new clock 2.10 GHz, details in the pathfinder log"]
+
+# link to the google sheet containing blacklisted obsids. maintaned by OVRO:
 url = "https://docs.google.com/spreadsheets/d/1ab23NlqiUetoygd6PWlbmwtgF70V1WcOhUhFo5XtSWo/export?format=csv&id=1ab23NlqiUetoygd6PWlbmwtgF70V1WcOhUhFo5XtSWo&gid=0"
 
 with rs.get(url=url) as res:
@@ -25,7 +30,7 @@ with open("google.csv", "r") as csv_file:
         elif stopID == "ongoing":
             stopID = 99999
 
-        if dataflag == 0:
+        if dataflag == 0 or reason in additional_blacklists:
             for i in range(startID, stopID+1, 1):
                 blacklist.append(i)
                 blacklist_reason.append(reason)
