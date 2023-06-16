@@ -7,45 +7,34 @@ import numpy.fft as fft
 import os
 import errno
 import h5py
-#import multiprocessing
-import tools
-#from scipy.io import FortranFile
 from scipy import stats
-#import astropy.coordinates as coord
-#from astropy.time import Time
-#from scipy import interpolate
-#import astropy.units as u
-#from astropy.coordinates import SkyCoord
-#import scipy as sp
-#import scipy.ndimage
-#from astropy.io import fits
 from scipy.stats import norm
-#from scipy.optimize import curve_fit
 import copy
-#import math
-#from astropy.time import Time
-#from astropy.coordinates import solar_system_ephemeris, EarthLocation
-#from astropy.coordinates import get_body_barycentric, get_body, get_moon
-#import healpy as hp
-#from matplotlib import cm
-#from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+
 import argparse
 import re 
 from tqdm import tqdm
 import warnings
 import time as tm
 
-warnings.filterwarnings("ignore", category = RuntimeWarning) #ignore warnings caused by weights cut-off
-warnings.filterwarnings("ignore", category = UserWarning) #ignore warnings caused by weights cut-off
+warnings.filterwarnings("ignore", category = RuntimeWarning) # Ignore warnings caused by mask nan/inf weights
+warnings.filterwarnings("ignore", category = UserWarning)    # Ignore warning when producing log plot of emty array
 
 import accept_mod.stats_list as stats_list
 stats_list = stats_list.stats_list
 
 from spikes import spike_data, spike_list, get_spike_list
 
+sys.path.append("/mn/stornext/d22/cmbco/comap/nils/pipeline/")
+from tools.read_runlist import read_runlist
+from l2gen_argparser import parser
+
+
+
+
 class L2plots():
     def __init__(self):
-        self.outpath = "/mn/stornext/d16/cmbco/comap/nils/plotbrowser/test_figs/"
+        self.outpath = "/mn/stornext/d22/cmbco/comap/nils/plotbrowser/new_figure_dir/"
         self.input()
         self.read_paramfile()
 
@@ -53,19 +42,10 @@ class L2plots():
         """
         Function parsing the command line input.
         """
-        parser = argparse.ArgumentParser()
-        parser.add_argument("-p", "--param", type = str,
-                            help = """Full path and name to parameter file.""")
-       
-        args = parser.parse_args()
-       
-        if args.param == None:
-            message = """No input parameterfile given, please provide an input parameterfile"""
-            raise NameError(message)
-        else:
-            self.param_file     = args.param
+        params = parser.parse_args()
+        self.params = params
 
-    def read_paramfile(self):
+    def read_paramfile_old(self):
         """
         Function reading the parameter file provided by the command line
         argument, and defining class parameters.
@@ -107,6 +87,42 @@ class L2plots():
         param_file.close()
         runlist_file.close()
 
+    def read_paramfile(self):
+        """
+        Function reading the parameter file provided by the command line
+        argument, and defining class parameters.
+        """
+    
+        params = self.params
+        self.scan_data_path = params.accept_data_folder                          # Extracting path
+
+        self.id_string = params.accept_data_id_string                                 # Extracting path
+        
+        self.l2_path = params.level2_dir                  # Extracting path
+        
+        self.runlist_path = params.runlist                  # Extracting path
+        
+        runlist_file = open(self.runlist_path, "r")         # Opening 
+        runlist = runlist_file.read()
+        
+        tod_in_list = re.findall(r"\/.*?\.\w+", runlist)
+        self.tod_in_list = tod_in_list
+
+        patch_name = re.search(r"\s([a-zA-Z0-9]+)\s", runlist)
+        self.patch_name = str(patch_name.group(1))
+
+        obsIDs = re.findall(r"\s\d{6}\s", runlist)         # Regex pattern to find all obsIDs in runlist
+        self.obsIDs = [num.strip() for num in obsIDs]
+        self.nobsIDs = len(self.obsIDs)                    # Number of obsIDs in runlist
+        
+        dates = re.findall(r"-(20\d{2}-\d{2}-\d{2}-\d+)\.", runlist)         # Regex pattern to find all dates in runlist
+        self.dates = [num.strip() for num in dates]
+
+        scans_per_obsid = re.findall(r"\s(\d+)\s20.+.hd5", runlist)
+        self.scans_per_obsid = [int(num.strip()) - 2 for num in scans_per_obsid]
+
+        runlist_file.close()
+
     def ensure_dir_exists(self, path):
         try:
             os.makedirs(path)
@@ -116,15 +132,14 @@ class L2plots():
 
     def run(self):
         ps_chi2, ps_s_feed, ps_s_chi2, ps_o_sb, ps_o_feed, ps_o_chi2 = self.open_scan_data()
-        
+
         for i in range(self.nobsIDs):
             self.obsid = self.obsIDs[i]
             self.date  = self.dates[i]
-            #if int(self.obsid) < 7321:
+            #if int(self.obsid) != 12338:
             #    continue
 
             print(f"Processing obsID: {self.obsid}")
-
             first_scanid = self.obsid + "02"
             idx = np.argmin(np.abs(self.allscanids - int(first_scanid)))
             start = idx
@@ -132,10 +147,6 @@ class L2plots():
 
             self.scanids = self.allscanids[start:stop]
             self.n_scans = len(self.scanids)
-
-            if (self.n_scans == 0):
-                print('No scans in obsid: ' + self.obsid)
-                continue
 
             self.ps_chi2 = ps_chi2[start:stop, ...]
             self.ps_s_feed = ps_s_feed[start:stop, ...]
@@ -183,15 +194,14 @@ class L2plots():
         return ps_chi2, ps_s_feed, ps_s_chi2, ps_o_sb, ps_o_feed, ps_o_chi2
 
     def get_corr(self):
-        with h5py.File(f"{self.l2_path}/{self.patch_name}/{self.l2name}", mode = "r") as my_file:
+        with h5py.File(os.path.join(f"{self.l2_path}{self.patch_name}" ,f"{self.l2name}"), mode = "r") as my_file:
             self.scan_id       = self.l2name[-12:-3]
             tod_ind       = np.array(my_file['tod'][:])
             sb_mean_ind   = np.array(my_file['sb_mean'][:])
             mask_ind      = my_file['freqmask'][:]
             mask_full_ind = my_file['freqmask_full'][:]
             reason_ind    = my_file['freqmask_reason'][:]
-            pixels        = np.array(my_file['pixels'][:]) - 1 
-            pix2ind       = my_file['pix2ind'][:]
+            pixels        = np.array(my_file['feeds'][:]) - 1 
             self.windspeed = np.mean(my_file['hk_windspeed'][()])
             self.feat = my_file['feature'][()]
             
@@ -314,10 +324,7 @@ class L2plots():
 
         for i in tqdm(range(self.n_scans)):
             self.l2name = f"{self.patch_name}_{self.scanids[i]:09}.h5"
-            try:
-                self.corr, self.var, self.n_det, self.acc, self.chi2, self.tsys, self.t0, self.spike_dat, self.reasonarr = self.get_corr()
-            except:
-                continue
+            self.corr, self.var, self.n_det, self.acc, self.chi2, self.tsys, self.t0, self.spike_dat, self.reasonarr = self.get_corr()
 
             self.corrs.append(self.corr)
             self.variances.append(self.var)
@@ -374,8 +381,8 @@ class L2plots():
         self.ensure_dir_exists(self.outpath + 'corr_hr')
         self.ensure_dir_exists(self.outpath + 'corr_lr')
         
-        plt.savefig(self.outpath + 'corr_hr/' + save_string, bbox_inches='tight', dpi=800)
-        plt.savefig(self.outpath + 'corr_lr/' + save_string, bbox_inches='tight', dpi=150) 
+        plt.savefig(self.outpath + 'corr_hr/corr_highres' + save_string, bbox_inches='tight', dpi=800)
+        plt.savefig(self.outpath + 'corr_lr/corr_lowres' + save_string, bbox_inches='tight', dpi=150) 
 
     def plot_scan_acc_chi2(self):
         fig = plt.figure(figsize=(6, 6))
@@ -469,11 +476,10 @@ class L2plots():
         fig = plt.figure(figsize=(6, 12))
 
         for i in range(3):
-            subplot = str(611 + 2 * i)
+            subplot = int(f"{611 + 2 * i}")
 
             var_exp = a2[i] * (self.pca[i]).std() ** 2 / self.radiometer ** 2 
-
-            ax2 = fig.add_subplot(subplot)
+            ax2 = fig.add_subplot(int(subplot))
             ax2.plot(self.time, self.pca[i], label=str(self.scan_id) + ", PCA comp. " + str(i+1))
 
             ax2.legend()
@@ -481,7 +487,7 @@ class L2plots():
             ax2.set_xlim(0, self.time[-1])
             ax2.set_xlabel('time [m]')
 
-            subplot = str(611 + 2 * i + 1)
+            subplot = int(f"{611 + 2 * i + 1}")
 
             ax = fig.add_subplot(subplot)
 
@@ -551,7 +557,7 @@ class L2plots():
             ax3.yaxis.set_minor_formatter(mticker.NullFormatter())
             ax3.xaxis.tick_top()
             ax3.xaxis.set_label_position('top') 
-            for i in range(20):
+            for i in range(ampl2.shape[1]):
 
                 ax = fig.add_subplot(gs[i+2, 0])
                 ax2 = fig.add_subplot(gs[i+2, 1])
@@ -700,7 +706,7 @@ class L2plots():
 
         for i in range(len(mean_std)):
             if mean_std[i] == 1e3:
-                ax.axvspan(x[i], x[i + 1], alpha=1, color='k', zorder=5)
+                ax.axvspan(x[i], x[i + 1], alpha=1.0, color='gray', zorder=5)
 
         ax.set_ylim(1, 1.4)
         ax.set_xlim(0.5, self.n_det + 0.48)
@@ -739,7 +745,6 @@ class L2plots():
         self.plot_scan_acc_var()
         print("Acc var plot:", tm.time() - t0, "s")
 
-
     def plot_ps_chi2_data(self):
         ps_chi2 = self.ps_chi2 
         ps_s_feed = self.ps_s_feed 
@@ -772,7 +777,7 @@ class L2plots():
         row = 0
         ax1 = fig5.add_subplot(spec5[row, 0])
         im = ax1.imshow(ps_chi2[0], interpolation = 'none', aspect = 'auto', vmin=-vmax, vmax=vmax, extent=(0.5, 4.5, self.n_det + 0.5, 0.5))
-        new_tick_locations = np.array(range(self.n_det))+1
+        new_tick_locations = np.array(range(self.n_det)) + 1
         ax1.set_yticks(new_tick_locations)
         x_tick_loc = [1, 2, 3, 4]
         x_tick_labels = ['LA', 'UA', 'LB', 'UB']
@@ -871,8 +876,7 @@ class L2plots():
 
         plt.savefig(self.outpath + "ps_chi2/" + outname, bbox_inches = 'tight', dpi=100)
         
-    def plot_obsid_diagnostics(self):
-        
+    def plot_obsid_correlation(self):
         fig = plt.figure()
         ax = fig.add_subplot(111)
 
@@ -903,9 +907,10 @@ class L2plots():
         
         plt.savefig(self.outpath + 'corr_hr/' + 'corr_highres' + save_string, bbox_inches='tight', dpi=800) 
         plt.savefig(self.outpath + 'corr_lr/' + 'corr_lowres' + save_string, bbox_inches='tight', dpi=150) 
-                
+        
+    def plot_obsid_acc_chi2(self):
         fig = plt.figure(figsize = (6, 6))
-        ax = fig.add_subplot(311)#211)
+        ax = fig.add_subplot(311)
         
         ax.set_title('Obsid: ' + str(self.obsid) + ', utc - 7: %02i [h]' % round(self.t0))
 
@@ -914,9 +919,9 @@ class L2plots():
         x = np.linspace(0.5, self.n_det + 0.5, len(self.acc) + 1)
         plotter = np.zeros((len(self.acc) + 1))
         plotter[:-1] = self.acc
-        eff_feeds = (self.acc.sum()/4.0)
+        self.eff_feeds = (self.acc.sum()/4.0)
         
-        ax.step(x, plotter, where='post', label='Effective feeds: ' + '%.2f' % eff_feeds)
+        ax.step(x, plotter, where='post', label='Effective feeds: ' + '%.2f' % self.eff_feeds)
 
         ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det + 1), ymin=0, ymax=1, linestyle='--', color='k', lw=0.6, alpha=0.2)
         ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det * 4 + 1), ymin=0, ymax=1, linestyle='--', color='k', lw=0.2, alpha=0.2)
@@ -942,9 +947,9 @@ class L2plots():
         x = np.linspace(0.5, self.n_det + 0.5, len(chi2))
         plotter = np.zeros((len(chi2)))
         plotter = chi2
-        chi2mean = np.nanmean(chi2)
+        self.chi2mean = np.nanmean(chi2)
 
-        ax.plot(x, plotter, label=r'$\langle \chi^2\rangle$: ' + '%.2f' % chi2mean)
+        ax.plot(x, plotter, label=r'$\langle \chi^2\rangle$: ' + '%.2f' % self.chi2mean)
 
         ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det + 1), ymin = ymin, ymax = ymax, linestyle = '--', color = 'k', lw = 0.6, alpha = 0.2)
         ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det * 4 + 1), ymin = ymin, ymax = ymax, linestyle = '--', color = 'k', lw = 0.2, alpha = 0.2)
@@ -969,9 +974,9 @@ class L2plots():
         x = np.linspace(0.5, self.n_det + 0.5, len(tsys) + 1)
         plotter = np.zeros((len(tsys) + 1))
         plotter[:-1] = tsys
-        tsysmean = np.nanmean(tsys)
+        self.tsysmean = np.nanmean(tsys)
 
-        ax.plot(x, plotter, '.', markersize = 1.5, label = r'$\langle T_{sys}\rangle$: ' + '%.2f' % tsysmean)
+        ax.plot(x, plotter, '.', markersize = 1.5, label = r'$\langle T_{sys}\rangle$: ' + '%.2f' % self.tsysmean)
 
         ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det + 1), ymin = ymin, ymax = ymax, linestyle = '--', color = 'k', lw = 0.6, alpha = 0.2)
         ax.vlines(np.linspace(0.5, self.n_det + 0.5, self.n_det * 4 + 1), ymin = ymin, ymax = ymax, linestyle = '--', color = 'k', lw = 0.2, alpha = 0.2)
@@ -993,16 +998,16 @@ class L2plots():
         figstring = "".join(figstrings)
 
         plt.figtext(0.92, 0.7, figstring[:-2])
-        save_string = 'acc_chi2_%06i.pdf' % (int(self.obsid))
+        save_string = 'acc_chi2_%06i.png' % (int(self.obsid))
 
         self.ensure_dir_exists(self.outpath + 'acc_chi2')
         plt.savefig(self.outpath + 'acc_chi2/' + save_string, bbox_inches='tight')
-        
-
+    
+    def plot_obsid_spikes(self):
         sortedlists = self.my_spikes.sorted()
-        n_spikes = len(sortedlists[0])
-        n_jumps = len(sortedlists[1])
-        n_anom = len(sortedlists[2]) 
+        self.n_spikes = len(sortedlists[0])
+        self.n_jumps = len(sortedlists[1])
+        self.n_anom = len(sortedlists[2]) 
 
         n_spike_types = 3
         n_plots = 3
@@ -1011,7 +1016,7 @@ class L2plots():
         
         fig.suptitle('Obsid: %06i, %i spikes, %i jumps and %i anomalies. Top: 3 largest spikes.\
         Middle: 3 largest jumps. Bottom: 3 largest anomalies' % (
-        int(self.obsid), n_spikes, n_jumps, n_anom))
+        int(self.obsid), self.n_spikes, self.n_jumps, self.n_anom))
         
         for i in range(n_spike_types):
             for j in range(n_plots):
@@ -1032,7 +1037,7 @@ class L2plots():
                     ax = fig.add_subplot(n_spike_types, n_plots, n_plots * i + j + 1)
                     pass
        
-        save_string = 'spikes_%06i.pdf' % (int(self.obsid))  # , i+1)
+        save_string = 'spikes_%06i.png' % (int(self.obsid))
 
         self.ensure_dir_exists(self.outpath + 'spikes')
 
@@ -1040,6 +1045,7 @@ class L2plots():
 
         plt.close('all')
 
+    def save_obsid_stats(self):
         statsdir = self.outpath + 'l2stats/'
 
         self.ensure_dir_exists(statsdir)
@@ -1051,16 +1057,21 @@ class L2plots():
         stats[2] = fields.index(self.patch_name)
         stats[3] = 0.0  # Scanning strategy 
         stats[4] = self.tstart
-        stats[5] = eff_feeds
-        stats[6] = chi2mean
-        stats[7] = tsysmean
-        stats[8] = n_spikes
-        stats[9] = n_jumps
-        stats[10] = n_anom
+        stats[5] = self.eff_feeds
+        stats[6] = self.chi2mean
+        stats[7] = self.tsysmean
+        stats[8] = self.n_spikes
+        stats[9] = self.n_jumps
+        stats[10] = self.n_anom
         
         save_string = 'l2_stats_%06i.txt' % (int(self.obsid))
         np.savetxt(statsdir + save_string, stats)
 
+    def plot_obsid_diagnostics(self):
+        self.plot_obsid_correlation()
+        self.plot_obsid_acc_chi2()
+        self.plot_obsid_spikes()
+        self.save_obsid_stats()
 
 if __name__ == "__main__":
     l2plotter = L2plots()
