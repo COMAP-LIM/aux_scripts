@@ -45,6 +45,6 @@ do
         mkdir -p "$destpath/$reldir"
 
         # Find all files in $dir and process them in parallel using GNU parallel
-        find "$dir" -type f | /astro/local/bin/parallel -j 12 process_file {} "$temppath" "$destpath"
+        find "$dir" -type f | /astro/local/bin/parallel -j 24 process_file {} "$temppath" "$destpath"
     fi
 done
