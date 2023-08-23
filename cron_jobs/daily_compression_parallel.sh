@@ -24,6 +24,7 @@ process_file() {
         echo "Moving repacked $filename to $destpath/$reldir"
         mv "$temppath/$reldir/$filename" "$destpath/$reldir/"
         echo "Removing write permission for $destpath/$reldir"
+        chgrp astcomap $destpath/$reldir/$filename
         chmod a-w $destpath/$reldir/$filename
 
         echo "Deleting original $filename"
