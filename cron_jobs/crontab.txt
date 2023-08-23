@@ -20,4 +20,4 @@ SCRIPT_DIR=/mn/stornext/d22/cmbco/comap/protodir/comap_aux/cron_jobs/
 00 07 * * * $SCRIPT_DIR/observerlog_blacklisting.sh >> $LOG_DIR/cronlog_blacklisting.log 2> >(tee -a $LOG_DIR/cronlog_blacklisting.log >&2)
 
 # PERMISSIONS: Updating permissions to astcomap group for all files
-00 08 * * * $SCRIPT_DIR/permissions.sh >> $LOG_DIR/cronlog_permissions.log 2> >(tee -a $LOG_DIR/cronlog_permissions.log >&2)
+# 00 08 * * * $SCRIPT_DIR/permissions.sh >> $LOG_DIR/cronlog_permissions.log 2> >(tee -a $LOG_DIR/cronlog_permissions.log >&2)
