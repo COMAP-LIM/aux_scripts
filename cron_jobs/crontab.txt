@@ -1,0 +1,23 @@
+# Cron uses sh shell by default, setting it to bash.
+SHELL=/bin/bash
+
+LOG_DIR=/mn/stornext/d22/cmbco/comap/protodir/logs/
+SCRIPT_DIR=/mn/stornext/d22/cmbco/comap/protodir/comap_aux/cron_jobs/
+
+# The weird piping used in this script redirects both stdout and stderr to the log file, but only stderr to the default cron output (which goes to email).
+
+# TRANSFER+COMPRESS Transfering yesterdays files from OVRO (in the evening, to give them time to complete), and then compressing those files.
+00 20 * * * $SCRIPT_DIR/transfer_level1_yesterday.sh >> $LOG_DIR/cronlog_daily_transfers.log 2> >(tee -a $LOG_DIR/cronlog_daily_transfers.txt >&2)
+00 01 * * * $SCRIPT_DIR/daily_compression_parallel.sh >> $LOG_DIR/cronlog_daily_compression.log 2> >(tee -a $LOG_DIR/cronlog_daily_compression.log >&2)
+
+# SATTELITE DOWNLOAD: Donwloading yesterdays satellite maps
+00 02 * * * $SCRIPT_DIR/satellite_maps.sh >> $LOG_DIR/cronlog_satellite.log 2> >(tee -a $LOG_DIR/cronlog_satellite.log >&2)
+
+# WEATHER-NN: Executing the weather-NN on new l1 files
+00 06 * * * $SCRIPT_DIR/weather_nn.sh >> $LOG_DIR/cronlog_weather.log 2> >(tee -a $LOG_DIR/cronlog_weather.log >&2)
+
+# BLACKLISTING: Reading the google doc blacklist from OVRO, and updating the blacklist npy file read by scan-detect.
+00 07 * * * $SCRIPT_DIR/observerlog_blacklisting.sh >> $LOG_DIR/cronlog_blacklisting.log 2> >(tee -a $LOG_DIR/cronlog_blacklisting.log >&2)
+
+# PERMISSIONS: Updating permissions to astcomap group for all files
+00 08 * * * $SCRIPT_DIR/permissions.sh >> $LOG_DIR/cronlog_permissions.log 2> >(tee -a $LOG_DIR/cronlog_permissions.log >&2)
