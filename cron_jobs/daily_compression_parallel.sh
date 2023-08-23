@@ -21,10 +21,12 @@ process_file() {
                  -l /spectrometer/tod:CHUNK=1x4x1024x4000 \
                  "$filepath" "$temppath/$reldir/$filename"
 
-        echo "Copying repacked $filename to $destpath/$reldir"
+        echo "Moving repacked $filename to $destpath/$reldir"
         mv "$temppath/$reldir/$filename" "$destpath/$reldir/"
+        echo "Removing write permission for $destpath/$reldir"
+        chmod a-w $destpath/$reldir/$filename
 
-        echo "Deleting original and repacked $filename"
+        echo "Deleting original $filename"
         rm "$filepath"
     fi
 }
