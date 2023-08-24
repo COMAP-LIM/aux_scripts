@@ -7,7 +7,7 @@ SCRIPT_DIR=/mn/stornext/d22/cmbco/comap/protodir/comap_aux/cron_jobs/
 # The weird piping used in this script redirects both stdout and stderr to the log file, but only stderr to the default cron output (which goes to email).
 
 # TRANSFER+COMPRESS Transfering yesterdays files from OVRO (in the evening, to give them time to complete), and then compressing those files.
-00 20 * * * $SCRIPT_DIR/transfer_level1_yesterday.sh >> $LOG_DIR/cronlog_daily_transfers.log 2> >(tee -a $LOG_DIR/cronlog_daily_transfers.txt >&2)
+00 20 * * * $SCRIPT_DIR/transfer_level1_yesterday.sh >> $LOG_DIR/cronlog_daily_transfers.log 2> >(tee -a $LOG_DIR/cronlog_daily_transfers.log >&2)
 00 01 * * * $SCRIPT_DIR/daily_compression_parallel.sh >> $LOG_DIR/cronlog_daily_compression.log 2> >(tee -a $LOG_DIR/cronlog_daily_compression.log >&2)
 
 # SATTELITE DOWNLOAD: Donwloading yesterdays satellite maps
