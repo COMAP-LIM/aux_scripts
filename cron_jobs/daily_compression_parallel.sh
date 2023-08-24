@@ -21,6 +21,12 @@ process_file() {
                  -l /spectrometer/tod:CHUNK=1x4x1024x4000 \
                  "$filepath" "$temppath/$reldir/$filename"
 
+        # Check if h5repack succeeded
+        if [ $? -ne 0 ]; then
+            echo "h5repack failed for $filename. Skipping further processing for this file."
+            return
+        fi
+
         echo "Moving repacked $filename to $destpath/$reldir"
         mv "$temppath/$reldir/$filename" "$destpath/$reldir/"
         echo "Removing write permission for $destpath/$reldir"
