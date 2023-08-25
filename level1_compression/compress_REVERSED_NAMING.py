@@ -48,7 +48,7 @@ class Compress:
         zerofiles = 0
         for filename in listdir(path):
             if isfile(path + filename): # Check if file. Could be dir.
-                if filename[:6] == "comap-" and filename[-4:] == ".hd5": # Do only files starting with comap- and ending with .hd5
+                if filename[:11] == "comp_comap-" and filename[-4:] == ".hd5": # Do only files starting with comap- and ending with .hd5
                     self.filenames.append(filename)
                     if os.path.getsize(path + filename) > 0:
                         nonzerofiles += 1
@@ -70,7 +70,7 @@ class Compress:
         t1 = time.time()
         for filename in self.filenames:
             raw_filepath = path + filename
-            comp_filepath = path + "comp_" + filename
+            comp_filepath = path + filename.strip("comp_")
             self.raw_size_sum += os.path.getsize(raw_filepath)
             self.comp_size_sum += os.path.getsize(comp_filepath)
         logging.info("Finished compression job. Old totsize=%.2fGB  new totsize=%.2fGB  ratio=%.2f" % (self.raw_size_sum*1e-9, self.comp_size_sum*1e-9, self.raw_size_sum/max(1, self.comp_size_sum)))
@@ -108,7 +108,7 @@ class Compress:
     def compress_file(self, file_index):
         #### Compression function for single file, which will be run by each thread. A unique file index is provided by the Pool.map func. ####
         filename = self.filenames[file_index]
-        comp_filename = "comp_" + filename
+        comp_filename = filename[5:]
         raw_filepath = path + filename  # Filepath of old uncompressed file.
         temp_filepath1 = RAMDISK_PATH + filename  # Uncompressed filepath of ram-disk (used for temporary storage while compressing).
         temp_filepath2 = RAMDISK_PATH + comp_filename  # Compressed filepath on ram-disk.
@@ -196,5 +196,5 @@ if __name__ == "__main__":
     #### Loop over paths and run the compression class on each directory. ####
     for path in paths:
         compress = Compress(nr_threads, path)
-        # compress.compress()
-        compress.validate()
+        compress.compress()
+        # compress.validate()
