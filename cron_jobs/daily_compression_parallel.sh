@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/bin/bash -l
+echo "Running parallel daily compression at $(date)."
 
 sourcepath="/mn/stornext/d22/cmbco/comap/protodir/level1/l1_temp/from_ovro"
 temppath="/mn/stornext/d22/cmbco/comap/protodir/level1/l1_temp/compressed"

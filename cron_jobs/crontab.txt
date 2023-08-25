@@ -1,21 +1,12 @@
 # Cron uses sh shell by default, setting it to bash.
 SHELL=/bin/bash
 
-LOG_DIR=/mn/stornext/d22/cmbco/comap/protodir/logs/
-SCRIPT_DIR=/mn/stornext/d22/cmbco/comap/protodir/comap_aux/cron_jobs/
-YESTERDAY_MONTH=$(date -d "yesterday" +%Y-%m)
-YESTERDAY_DAY=$(date -d "yesterday" +%Y-%m-%d)
+LOG_DIR=/mn/stornext/d22/cmbco/comap/protodir/logs
+SCRIPT_DIR=/mn/stornext/d22/cmbco/comap/protodir/comap_aux/cron_jobs
 
 # The weird piping used in this script redirects both stdout and stderr to the log file, but only stderr to the default cron output (which goes to email).
 
-# TRANSFER+COMPRESS Transfering yesterdays files from OVRO (in the evening, to give them time to complete), and then compressing those files.
-# WEATHER-NN: Executing the weather-NN on new l1 files
-00 20 * * * $SCRIPT_DIR/transfer_level1_for_day.sh $(YESTERDAY_MONTH) $(YESTERDAY_DAY) >> $LOG_DIR/cronlog_daily_transfers.log 2> >(tee -a $LOG_DIR/cronlog_daily_transfers.log >&2);\
-            $SCRIPT_DIR/daily_compression_parallel.sh >> $LOG_DIR/cronlog_daily_compression.log 2> >(tee -a $LOG_DIR/cronlog_daily_compression.log >&2);\
-            $SCRIPT_DIR/weather_nn.sh >> $LOG_DIR/cronlog_weather.log 2> >(tee -a $LOG_DIR/cronlog_weather.log >&2)
-            $SCRIPT_DIR/daily_scandetect.sh >> $LOG_DIR/cronlog_scandetect.log 2> >(tee -a $LOG_DIR/cronlog_scandetect.log >&2)
-            $SCRIPT_DIR/daily_tsys_database.sh $(YESTERDAY_MONTH) >> $LOG_DIR/cronlog_weather.log 2> >(tee -a $LOG_DIR/cronlog_weather.log >&2)
-            $SCRIPT_DIR/daily_l2gen.sh >> $LOG_DIR/cronlog_l2gen.log 2> >(tee -a $LOG_DIR/cronlog_l2gen.log >&2)
+00 20 * * * $SCRIPT_DIR/execute_daily_scripts.sh > /dev/null
 
 # SATTELITE DOWNLOAD: Donwloading yesterdays satellite maps
 00 02 * * * $SCRIPT_DIR/satellite_maps.sh >> $LOG_DIR/cronlog_satellite.log 2> >(tee -a $LOG_DIR/cronlog_satellite.log >&2)
