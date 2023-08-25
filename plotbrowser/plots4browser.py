@@ -25,16 +25,9 @@ stats_list = stats_list.stats_list
 
 from spikes import spike_data, spike_list, get_spike_list
 
-sys.path.append("/mn/stornext/d22/cmbco/comap/nils/pipeline/")
-from tools.read_runlist import read_runlist
-from l2gen_argparser import parser
-
-
-
-
 class L2plots():
     def __init__(self):
-        self.outpath = "/mn/stornext/d22/cmbco/comap/nils/plotbrowser/new_figure_dir/"
+        self.outpath = "/mn/stornext/d22/cmbco/comap/nils/plotbrowser/test_figs/"
         self.input()
         self.read_paramfile()
 
@@ -42,10 +35,19 @@ class L2plots():
         """
         Function parsing the command line input.
         """
-        params = parser.parse_args()
-        self.params = params
+        parser = argparse.ArgumentParser()
+        parser.add_argument("-p", "--param", type = str,
+                            help = """Full path and name to parameter file.""")
+       
+        args = parser.parse_args()
+       
+        if args.param == None:
+            message = """No input parameterfile given, please provide an input parameterfile"""
+            raise NameError(message)
+        else:
+            self.param_file     = args.param
 
-    def read_paramfile_old(self):
+    def read_paramfile(self):
         """
         Function reading the parameter file provided by the command line
         argument, and defining class parameters.
@@ -87,42 +89,6 @@ class L2plots():
         param_file.close()
         runlist_file.close()
 
-    def read_paramfile(self):
-        """
-        Function reading the parameter file provided by the command line
-        argument, and defining class parameters.
-        """
-    
-        params = self.params
-        self.scan_data_path = params.accept_data_folder                          # Extracting path
-
-        self.id_string = params.accept_data_id_string                                 # Extracting path
-        
-        self.l2_path = params.level2_dir                  # Extracting path
-        
-        self.runlist_path = params.runlist                  # Extracting path
-        
-        runlist_file = open(self.runlist_path, "r")         # Opening 
-        runlist = runlist_file.read()
-        
-        tod_in_list = re.findall(r"\/.*?\.\w+", runlist)
-        self.tod_in_list = tod_in_list
-
-        patch_name = re.search(r"\s([a-zA-Z0-9]+)\s", runlist)
-        self.patch_name = str(patch_name.group(1))
-
-        obsIDs = re.findall(r"\s\d{6}\s", runlist)         # Regex pattern to find all obsIDs in runlist
-        self.obsIDs = [num.strip() for num in obsIDs]
-        self.nobsIDs = len(self.obsIDs)                    # Number of obsIDs in runlist
-        
-        dates = re.findall(r"-(20\d{2}-\d{2}-\d{2}-\d+)\.", runlist)         # Regex pattern to find all dates in runlist
-        self.dates = [num.strip() for num in dates]
-
-        scans_per_obsid = re.findall(r"\s(\d+)\s20.+.hd5", runlist)
-        self.scans_per_obsid = [int(num.strip()) - 2 for num in scans_per_obsid]
-
-        runlist_file.close()
-
     def ensure_dir_exists(self, path):
         try:
             os.makedirs(path)
@@ -132,20 +98,23 @@ class L2plots():
 
     def run(self):
         ps_chi2, ps_s_feed, ps_s_chi2, ps_o_sb, ps_o_feed, ps_o_chi2 = self.open_scan_data()
-
+        
         for i in range(self.nobsIDs):
             self.obsid = self.obsIDs[i]
             self.date  = self.dates[i]
+            print(self.obsid)
             #if int(self.obsid) != 12338:
             #    continue
 
             print(f"Processing obsID: {self.obsid}")
+
             first_scanid = self.obsid + "02"
             idx = np.argmin(np.abs(self.allscanids - int(first_scanid)))
             start = idx
             stop  = idx + self.scans_per_obsid[i]
 
             self.scanids = self.allscanids[start:stop]
+            print(self.scanids, np.min(np.abs(self.allscanids - int(first_scanid))), np.max(self.allscanids), int(first_scanid), np.any(self.allscanids == int(first_scanid)))
             self.n_scans = len(self.scanids)
 
             self.ps_chi2 = ps_chi2[start:stop, ...]
@@ -194,14 +163,16 @@ class L2plots():
         return ps_chi2, ps_s_feed, ps_s_chi2, ps_o_sb, ps_o_feed, ps_o_chi2
 
     def get_corr(self):
-        with h5py.File(os.path.join(f"{self.l2_path}{self.patch_name}" ,f"{self.l2name}"), mode = "r") as my_file:
+        n_ampl = 10
+        with h5py.File(f"{self.l2_path}/{self.patch_name}/{self.l2name}", mode = "r") as my_file:
             self.scan_id       = self.l2name[-12:-3]
             tod_ind       = np.array(my_file['tod'][:])
             sb_mean_ind   = np.array(my_file['sb_mean'][:])
             mask_ind      = my_file['freqmask'][:]
             mask_full_ind = my_file['freqmask_full'][:]
             reason_ind    = my_file['freqmask_reason'][:]
-            pixels        = np.array(my_file['feeds'][:]) - 1 
+            pixels        = np.array(my_file['pixels'][:]) - 1 
+            pix2ind       = my_file['pix2ind'][:]
             self.windspeed = np.mean(my_file['hk_windspeed'][()])
             self.feat = my_file['feature'][()]
             
@@ -227,9 +198,9 @@ class L2plots():
                 self.eigv     = np.array(my_file['pca_eigv'])
                 ampl_ind = np.array(my_file['pca_ampl'])
             except KeyError:
-                self.pca = np.zeros((4, self.n_samp))
-                self.eigv = np.zeros(4)
-                ampl_ind = np.zeros((4, *mask_full_ind.shape))
+                self.pca = np.zeros((n_ampl, self.n_samp))
+                self.eigv = np.zeros(n_ampl)
+                ampl_ind = np.zeros((n_ampl, *mask_full_ind.shape))
                 print('Found no pca comps')
             try:
                 tsys_ind = np.array(my_file['Tsys_lowres'])
@@ -250,7 +221,7 @@ class L2plots():
         mask      = np.zeros((self.n_det, self.n_sb, self.n_freq))
         mask_full = np.zeros((self.n_det, self.n_sb, self.n_freq_hr))
         acc       = np.zeros((self.n_det, self.n_sb))
-        self.ampl      = np.zeros((4, self.n_det, self.n_sb, self.n_freq_hr))
+        self.ampl      = np.zeros((n_ampl, self.n_det, self.n_sb, self.n_freq_hr))
         tsys      = np.zeros((self.n_det, self.n_sb, self.n_freq))
         chi2      = np.zeros((self.n_det, self.n_sb, self.n_freq))
         sd        = np.zeros((3, self.n_det, self.n_sb, 4, 1000))
@@ -324,7 +295,10 @@ class L2plots():
 
         for i in tqdm(range(self.n_scans)):
             self.l2name = f"{self.patch_name}_{self.scanids[i]:09}.h5"
+            #try:
             self.corr, self.var, self.n_det, self.acc, self.chi2, self.tsys, self.t0, self.spike_dat, self.reasonarr = self.get_corr()
+            #except:
+            #    continue
 
             self.corrs.append(self.corr)
             self.variances.append(self.var)
@@ -338,6 +312,7 @@ class L2plots():
             self.plot_scan_diagnostics()
 
         self.t0     = (np.mean(np.array(self.t0s)) * 24 - 7) % 24 
+        print("hei", self.t0s)
         self.tstart = np.min(np.array(self.t0s))
         self.corrs  = np.array(self.corrs)
         self.variances = np.array(self.variances)
@@ -476,10 +451,11 @@ class L2plots():
         fig = plt.figure(figsize=(6, 12))
 
         for i in range(3):
-            subplot = int(f"{611 + 2 * i}")
+            subplot = str(611 + 2 * i)
 
             var_exp = a2[i] * (self.pca[i]).std() ** 2 / self.radiometer ** 2 
-            ax2 = fig.add_subplot(int(subplot))
+
+            ax2 = fig.add_subplot(subplot)
             ax2.plot(self.time, self.pca[i], label=str(self.scan_id) + ", PCA comp. " + str(i+1))
 
             ax2.legend()
@@ -487,7 +463,7 @@ class L2plots():
             ax2.set_xlim(0, self.time[-1])
             ax2.set_xlabel('time [m]')
 
-            subplot = int(f"{611 + 2 * i + 1}")
+            subplot = str(611 + 2 * i + 1)
 
             ax = fig.add_subplot(subplot)
 
@@ -557,7 +533,7 @@ class L2plots():
             ax3.yaxis.set_minor_formatter(mticker.NullFormatter())
             ax3.xaxis.tick_top()
             ax3.xaxis.set_label_position('top') 
-            for i in range(ampl2.shape[1]):
+            for i in range(20):
 
                 ax = fig.add_subplot(gs[i+2, 0])
                 ax2 = fig.add_subplot(gs[i+2, 1])
