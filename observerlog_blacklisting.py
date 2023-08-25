@@ -21,7 +21,10 @@ with open("google.csv", "r") as csv_file:
     for row in csv_reader:
         startID = int(row[0])
         stopID = row[1]
-        dataflag = int(row[4])
+        try:
+            dataflag = int(row[4])
+        except:
+            dataflag = 0
         reason = row[5]
         if stopID.isdigit():
             stopID = int(stopID)
