@@ -1,5 +1,5 @@
 """Example usage:
-python3 -W ignore tsys_database_write_new.py -o -n 28 -p level1_database_files -m 2019-10 2019-09 2019-08
+python3 -W ignore tsys_database_write.py -o -n 28 -p level1_database_files -m 2019-10 2019-09 2019-08
 """
 import numpy as np
 import h5py
@@ -14,8 +14,8 @@ import argparse
 
 def worker(fileidx):
     if fileidx < Nthreads:
-        print(f"Worker {fileidx} waiting {fileidx*30} seconds.")
-        time.sleep(fileidx*30)
+        print(f"Worker {fileidx} waiting {fileidx*10} seconds.")
+        time.sleep(fileidx*10)
 
     t0 = time.time()
     filename = filenames[fileidx]
