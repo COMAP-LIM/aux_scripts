@@ -13,12 +13,14 @@ YESTERDAY_DAY=$(date -d "yesterday" +%Y-%m-%d)
 00 20 * * * $SCRIPT_DIR/transfer_level1_for_day.sh $(YESTERDAY_MONTH) $(YESTERDAY_DAY) >> $LOG_DIR/cronlog_daily_transfers.log 2> >(tee -a $LOG_DIR/cronlog_daily_transfers.log >&2);\
             $SCRIPT_DIR/daily_compression_parallel.sh >> $LOG_DIR/cronlog_daily_compression.log 2> >(tee -a $LOG_DIR/cronlog_daily_compression.log >&2);\
             $SCRIPT_DIR/weather_nn.sh >> $LOG_DIR/cronlog_weather.log 2> >(tee -a $LOG_DIR/cronlog_weather.log >&2)
+            $SCRIPT_DIR/daily_scandetect.sh >> $LOG_DIR/cronlog_scandetect.log 2> >(tee -a $LOG_DIR/cronlog_scandetect.log >&2)
             $SCRIPT_DIR/daily_tsys_database.sh $(YESTERDAY_MONTH) >> $LOG_DIR/cronlog_weather.log 2> >(tee -a $LOG_DIR/cronlog_weather.log >&2)
+            $SCRIPT_DIR/daily_l2gen.sh >> $LOG_DIR/cronlog_l2gen.log 2> >(tee -a $LOG_DIR/cronlog_l2gen.log >&2)
 
 # SATTELITE DOWNLOAD: Donwloading yesterdays satellite maps
 00 02 * * * $SCRIPT_DIR/satellite_maps.sh >> $LOG_DIR/cronlog_satellite.log 2> >(tee -a $LOG_DIR/cronlog_satellite.log >&2)
 
-# BLACKLISTING: Reading the google doc blacklist from OVRO, and updating the blacklist npy file read by scan-detect.
+# BLACKLISTING: Reading the google doc blacklist from OVRO, and updating the blacklist npy of files to be ignored by l2gen.
 00 07 * * * $SCRIPT_DIR/observerlog_blacklisting.sh >> $LOG_DIR/cronlog_blacklisting.log 2> >(tee -a $LOG_DIR/cronlog_blacklisting.log >&2)
 
 # PERMISSIONS: Updating permissions to astcomap group for all files
