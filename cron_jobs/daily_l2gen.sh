@@ -1,3 +1,4 @@
-#!/bin/bash -l
+#!/bin/bash
+export PATH=/net/alruba2.uio.no/mn/alruba2/astro/local/opt/intel/oneapi/compiler/2022.2.0/linux/bin/intel64:/net/alruba2.uio.no/mn/alruba2/astro/local/opt/intel/oneapi/mpi/2021.7.0/libfabric/bin:/net/alruba2.uio.no/mn/alruba2/astro/local/opt/intel/oneapi/mpi/2021.7.0/bin:/mn/stornext/u3/sigurdkn/local/moduledata/python3.10/bin:/mn/stornext/u3/jonassl/local/bin:/mn/stornext/u3/jonassl/.local/bin:/astro/local/opt/Intel/compilers_and_libraries_2020.4.304/linux/mpi/intel64/bin:/astro/local/opt/Intel/compilers_and_libraries_2020.4.304/linux/bin/intel64:/astro/local/opt/Intel/compilers_and_libraries_2020.4.304/linux/mpi/intel64/libfabric/bin:/astro/local/opt/Intel/debugger_2020/gdb/intel64/bin:/usr/lib64/qt-3.3/bin:/astro/local/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/usr/lib64/openmpi/bin:/opt/dell/srvadmin/bin
 echo "Running daily l2gen at $(date)."
 OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 MKL_NUM_THREADS=2 mpirun -n 12 python3 -u -m mpi4py /mn/stornext/d22/cmbco/comap/protodir/pipeline/l2gen.py -p /mn/stornext/d22/cmbco/comap/protodir/params/param_allco_default.txt

@@ -1,10 +1,13 @@
+# The weird piping used in this script redirects both stdout and stderr to the log file, but only stderr to the default cron output (which goes to email).
+# Cron lacks a lot of bash commands, so the solution involves putting some of the code in the "execute_daily_scripts.sh" file.
+# I also previously invoked a login shell with "#!/bin/bash -l" in all bash scripts, which would conveniently trigger .bashrc etc and loading of needed modules.
+# However, the modules "Loading x" print goes to stderr, meaning it would go to my email every night. The new solution works but is ugly: The PATH is manually set in every script.
+
 # Cron uses sh shell by default, setting it to bash.
 SHELL=/bin/bash
 
 LOG_DIR=/mn/stornext/d22/cmbco/comap/protodir/logs
 SCRIPT_DIR=/mn/stornext/d22/cmbco/comap/protodir/comap_aux/cron_jobs
-
-# The weird piping used in this script redirects both stdout and stderr to the log file, but only stderr to the default cron output (which goes to email).
 
 00 20 * * * $SCRIPT_DIR/execute_daily_scripts.sh > /dev/null
 
@@ -12,7 +15,7 @@ SCRIPT_DIR=/mn/stornext/d22/cmbco/comap/protodir/comap_aux/cron_jobs
 00 02 * * * $SCRIPT_DIR/satellite_maps.sh >> $LOG_DIR/cronlog_satellite.log 2> >(tee -a $LOG_DIR/cronlog_satellite.log >&2)
 
 # BLACKLISTING: Reading the google doc blacklist from OVRO, and updating the blacklist npy of files to be ignored by l2gen.
-00 07 * * * $SCRIPT_DIR/observerlog_blacklisting.sh >> $LOG_DIR/cronlog_blacklisting.log 2> >(tee -a $LOG_DIR/cronlog_blacklisting.log >&2)
+45 19 * * * $SCRIPT_DIR/observerlog_blacklisting.sh >> $LOG_DIR/cronlog_blacklisting.log 2> >(tee -a $LOG_DIR/cronlog_blacklisting.log >&2)
 
 # PERMISSIONS: Updating permissions to astcomap group for all files
 # 00 08 * * * $SCRIPT_DIR/permissions.sh >> $LOG_DIR/cronlog_permissions.log 2> >(tee -a $LOG_DIR/cronlog_permissions.log >&2)
