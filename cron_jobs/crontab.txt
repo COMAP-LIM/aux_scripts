@@ -9,7 +9,7 @@ SHELL=/bin/bash
 LOG_DIR=/mn/stornext/d22/cmbco/comap/protodir/logs
 SCRIPT_DIR=/mn/stornext/d22/cmbco/comap/protodir/comap_aux/cron_jobs
 
-00 20 * * * $SCRIPT_DIR/execute_daily_scripts.sh >> $LOG_DIR/cronlog_daily_scripts.log 2> >(tee -a $LOG_DIR/cronlog_daily_scripts.log >&2);\
+00 20 * * * $SCRIPT_DIR/execute_daily_scripts.sh >> $LOG_DIR/cronlog_daily_scripts.log;\
 
 # SATTELITE DOWNLOAD: Donwloading yesterdays satellite maps
 00 02 * * * $SCRIPT_DIR/satellite_maps.sh >> $LOG_DIR/cronlog_satellite.log 2> >(tee -a $LOG_DIR/cronlog_satellite.log >&2)
