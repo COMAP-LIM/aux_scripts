@@ -1,6 +1,7 @@
 """Example usage:
 python3 -W ignore tsys_database_write.py -o -n 28 -p level1_database_files -m 2019-10 2019-09 2019-08
 """
+import sys
 import numpy as np
 import h5py
 from os import listdir, makedirs
@@ -94,7 +95,7 @@ if __name__ == "__main__":
     blacklist = []
     if not args.overwrite:
         print(f"Creating list of already existing files...")
-        for f in tqdm(listdir(args.path)):
+        for f in tqdm(listdir(args.path), file=sys.stdout):
             if isfile(join(args.path, f)):
                 if f[-4:] == ".hd5" or f[-3:] == ".h5":
                     with h5py.File(join(args.path, f), "r") as infile:
