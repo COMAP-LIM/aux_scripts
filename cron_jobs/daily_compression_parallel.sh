@@ -16,28 +16,34 @@ process_file() {
     
     # Check if the filename starts with "comap-" and ends with ".hd5"
     if [[ $filename == comap-*.hd5 ]]; then
-        reldir=$(dirname "$filepath" | sed "s|$sourcepath/||")
+        if h5dump -a comap/source "$filepath" | grep -qE "co[267]"; then
+            echo "File" $filename "contains a CO field. Continuing."
 
-        echo "Repacking $filename to $temppath/$reldir"
-        h5repack -f /spectrometer/tod:SHUF \
-                 -f /spectrometer/tod:GZIP=3 \
-                 -l /spectrometer/tod:CHUNK=1x4x1024x4000 \
-                 "$filepath" "$temppath/$reldir/$filename"
+            reldir=$(dirname "$filepath" | sed "s|$sourcepath/||")
 
-        # Check if h5repack succeeded
-        if [ $? -ne 0 ]; then
-            echo "h5repack failed for $filename. Skipping further processing for this file."
-            return
+            echo "Repacking $filename to $temppath/$reldir"
+            h5repack -f /spectrometer/tod:SHUF \
+                    -f /spectrometer/tod:GZIP=3 \
+                    -l /spectrometer/tod:CHUNK=1x4x1024x4000 \
+                    "$filepath" "$temppath/$reldir/$filename"
+
+            # Check if h5repack succeeded
+            if [ $? -ne 0 ]; then
+                echo "h5repack failed for $filename. Skipping further processing for this file."
+                return
+            fi
+
+            echo "Moving repacked $filename to $destpath/$reldir"
+            mv "$temppath/$reldir/$filename" "$destpath/$reldir/"
+            echo "Removing write permission for $destpath/$reldir"
+            chgrp astcomap $destpath/$reldir/$filename
+            chmod a-w $destpath/$reldir/$filename
+
+            echo "Deleting original $filename"
+            rm "$filepath"
+        else
+            echo "File" $filename "is not a co2, co6, or co7 file. Deleting."
         fi
-
-        echo "Moving repacked $filename to $destpath/$reldir"
-        mv "$temppath/$reldir/$filename" "$destpath/$reldir/"
-        echo "Removing write permission for $destpath/$reldir"
-        chgrp astcomap $destpath/$reldir/$filename
-        chmod a-w $destpath/$reldir/$filename
-
-        echo "Deleting original $filename"
-        rm "$filepath"
     fi
 }
 
