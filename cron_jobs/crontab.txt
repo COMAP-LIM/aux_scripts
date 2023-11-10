@@ -6,8 +6,8 @@
 # Cron uses sh shell by default, setting it to bash.
 SHELL=/bin/bash
 
-LOG_DIR=/mn/stornext/d22/cmbco/comap/protodir/logs
-SCRIPT_DIR=/mn/stornext/d22/cmbco/comap/protodir/comap_aux/cron_jobs
+LOG_DIR=/mn/stornext/d16/cmbco/comap/data/logs
+SCRIPT_DIR=/mn/stornext/d16/cmbco/comap/src/comap_aux/cron_jobs
 
 00 20 * * * $SCRIPT_DIR/execute_daily_scripts.sh >> $LOG_DIR/cronlog_daily_scripts.log
 

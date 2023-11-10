@@ -1,7 +1,7 @@
 #!/bin/bash
 
-LOG_DIR=/mn/stornext/d22/cmbco/comap/protodir/logs
-SCRIPT_DIR=/mn/stornext/d22/cmbco/comap/protodir/comap_aux/cron_jobs
+LOG_DIR=/mn/stornext/d16/cmbco/comap/data/logs
+SCRIPT_DIR=/mn/stornext/d16/cmbco/comap/src/comap_aux/cron_jobs
 
 # Cron doesn't support dynamic variable assigment from stuff like the "date" command, so we need this wrapper script to ensure every script is passed the same datetime.
 YESTERDAY_MONTH=$(date -d "yesterday" +%Y-%m)
@@ -18,4 +18,4 @@ $SCRIPT_DIR/daily_compression_parallel.sh >> $LOG_DIR/cronlog_daily_compression.
 $SCRIPT_DIR/weather_nn.sh >> $LOG_DIR/cronlog_weather.log 2> >(tee -a $LOG_DIR/cronlog_weather.log >&2);\
 $SCRIPT_DIR/daily_scandetect.sh >> $LOG_DIR/cronlog_scandetect.log 2> >(tee -a $LOG_DIR/cronlog_scandetect.log >&2);\
 $SCRIPT_DIR/daily_tsys_database.sh $YESTERDAY_MONTH >> $LOG_DIR/cronlog_tsys_database.log 2> >(tee -a $LOG_DIR/cronlog_tsys_database.log >&2);\
-$SCRIPT_DIR/daily_l2gen.sh >> $LOG_DIR/cronlog_l2gen.log 2> >(tee -a $LOG_DIR/cronlog_l2gen.log >&2);\
+#$SCRIPT_DIR/daily_l2gen.sh >> $LOG_DIR/cronlog_l2gen.log 2> >(tee -a $LOG_DIR/cronlog_l2gen.log >&2);\

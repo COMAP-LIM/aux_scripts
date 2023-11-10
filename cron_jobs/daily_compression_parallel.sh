@@ -3,9 +3,9 @@ export PATH=/net/alruba2.uio.no/mn/alruba2/astro/local/opt/intel/oneapi/compiler
 
 echo "Running parallel daily compression at $(date)."
 
-sourcepath="/mn/stornext/d22/cmbco/comap/protodir/level1/l1_temp/from_ovro"
-temppath="/mn/stornext/d22/cmbco/comap/protodir/level1/l1_temp/compressed"
-destpath="/mn/stornext/d22/cmbco/comap/protodir/level1"
+sourcepath="/mn/stornext/d16/cmbco/comap/data/level1/l1_temp/from_ovro"
+temppath="/mn/stornext/d16/cmbco/comap/data/level1/l1_temp/compressed"
+destpath="/mn/stornext/d16/cmbco/comap/data/level1"
 
 process_file() {
     filepath="$1"
@@ -43,6 +43,7 @@ process_file() {
             rm "$filepath"
         else
             echo "File" $filename "is not a co2, co6, or co7 file. Deleting."
+            rm "$filepath"
         fi
     fi
 }
