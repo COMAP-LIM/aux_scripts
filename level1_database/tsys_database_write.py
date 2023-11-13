@@ -105,7 +105,7 @@ if __name__ == "__main__":
         print(f"Writing in append mode. Ignoring {len(blacklist)} already existing files.")
     filenames = []
     for month in months:
-        path = f"/mn/stornext/d22/cmbco/comap/protodir/level1/{month}/"
+        path = f"/mn/stornext/d16/cmbco/comap/data/level1/{month}/"
         for f in listdir(path):
             if isfile(join(path, f)):
                 if f[-4:] == ".hd5" or f[-3:] == ".h5":
