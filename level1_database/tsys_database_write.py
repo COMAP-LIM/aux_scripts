@@ -106,12 +106,13 @@ if __name__ == "__main__":
     filenames = []
     for month in months:
         path = f"/mn/stornext/d16/cmbco/comap/data/level1/{month}/"
-        for f in listdir(path):
-            if isfile(join(path, f)):
-                if f[-4:] == ".hd5" or f[-3:] == ".h5":
-                    if len(f.split("-")) > 1:
-                        if not f.split("-")[1] in blacklist:
-                            filenames.append(join(path, f))
+        if exists(path):
+            for f in listdir(path):
+                if isfile(join(path, f)):
+                    if f[-4:] == ".hd5" or f[-3:] == ".h5":
+                        if len(f.split("-")) > 1:
+                            if not f.split("-")[1] in blacklist:
+                                filenames.append(join(path, f))
     Nfiles = len(filenames)
     print(f"Found {Nfiles} level 1 files.")
     t1 = time.time()
