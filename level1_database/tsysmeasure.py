@@ -93,7 +93,7 @@ class TsysMeasure:
                         if np.sum(tod_freq_mean > 0) > 10:  # Check number of valid points. Also catches NaNs.
                             threshold = 0.95*np.nanmax(tod_freq_mean)
                             threshold_idxs = np.argwhere(tod_freq_mean > threshold)  # Points where tod is at least 95% of max. (We assume this is only true during Tsys measurement).
-                            if threshold > 2*np.median(tod_freq_mean):  # The calib should be substantially higher in power than the median. If not, there is likely no successful calib.
+                            if threshold > 2*np.percentile(tod_freq_mean, 5):  # The calib should be substantially higher in power than the median. If not, there is likely no successful calib.
                                 if threshold_idxs[-1][0] - threshold_idxs[0][0] > 90:
                                     margin = 40
                                 elif threshold_idxs[-1][0] - threshold_idxs[0][0] < 40:
