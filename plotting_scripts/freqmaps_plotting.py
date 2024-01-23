@@ -27,18 +27,23 @@ def smooth_map(data, gauss_sigma=1.0):
     _map[~np.isfinite(data)] = 0.0
     return _map
 
-def make_maps(map1_path, map1_dataname, map2_path="", map2_dataname="", name1="", name2="", mode="sigma", compare=False, with_diff=False, out_filepath="", title="", smooth=True):
+def make_maps(map1_path, map1_dataname, map2_path="", map2_dataname="", name1="", name2="", mode="sigma", compare=False, with_diff=False, out_filepath="", title="", smooth=True, res_factor=1.0):
     """
         map1_path: Absolute filepath to first map.
         map1_dataname: Path to the dataset inside the hd5 file. Should be the path to the map-datafile, even if you want to plot rms or sens.
         map2_path: Absolute filepath to second map. Only required if "compare" is True.
         map2_dataname: Path to the dataset inside the hd5 file.
+        name1: Title for the map1 maps.
+        name2: Title for the map2 maps.
         mode:
             "sigma": Maps of the signal data in units of sigma (divided by the rms), with contours of the rms.
             "rms": Maps of the rms.
             "sens": Maps of the inverse rms.
         compare: If True, plots map1 and map2 next to each other for every frequency.
         with_diff: Requires compare to be True. Also plots the difference between map1 and map2.
+        out_filepath: Full path and, optionally, beginning of filename (more will be appended).
+        smooth: Whether to smooth the maps. Only applies to "sigma" mode.
+        res_factor: Resolution factor for the images. Use 0.5-1.0 for faster plotting and slightly pixelated images. Don't go much over 1.0. 
     """
 
     with h5py.File(map1_path, "r") as f:
@@ -87,10 +92,8 @@ def make_maps(map1_path, map1_dataname, map2_path="", map2_dataname="", name1=""
 
     if not compare:
         for sb in trange(4):
-            # fig, ax = plt.subplots(64, 19, figsize=(40, 160))
-            fig, ax = plt.subplots(64, 19, figsize=(20, 80))
-            # fig.suptitle(f"{title} {sb_names[sb]}", fontsize=80, y=1.005)
-            fig.suptitle(f"{title} {sb_names[sb]}", fontsize=40, y=1.005)
+            fig, ax = plt.subplots(64, 19, figsize=(40*res_factor, 160*res_factor))
+            fig.suptitle(f"{title} {sb_names[sb]}", fontsize=80*res_factor, y=1.005)
             for freq in range(64):
                 for feed in range(19):
                     center_x, center_y = 60, 60
@@ -108,7 +111,7 @@ def make_maps(map1_path, map1_dataname, map2_path="", map2_dataname="", name1=""
                     ax[freq,feed].set_ylim(center_y+32,center_y-32)
                     ax[freq,feed].grid(False)
                     ax[freq,feed].axis(False)
-                    ax[freq,feed].set_title(f"feed {feed+1}\n {sb_names[sb]} - ch {freq}")
+                    ax[freq,feed].set_title(f"feed {feed+1}\n {sb_names[sb]} - ch {freq}", fontsize=10.0*res_factor)
             plt.tight_layout()
             _filename = f"{out_filepath}_sb{sb}"
             if smooth:
@@ -119,10 +122,8 @@ def make_maps(map1_path, map1_dataname, map2_path="", map2_dataname="", name1=""
 
     else: # If compare
         for sb in trange(4):
-            # fig, ax = plt.subplots(64, 19*3, figsize=(40*3, 160))
-            fig, ax = plt.subplots(64, 19*3, figsize=(20*3, 80))
-            # fig.suptitle(f"{title}. {sb_names[sb]}.", fontsize=180, y=1.01)
-            fig.suptitle(f"{title}. {sb_names[sb]}.", fontsize=90, y=1.01)
+            fig, ax = plt.subplots(64, 19*3, figsize=(40*3*res_factor, 160*res_factor))
+            fig.suptitle(f"{title}. {sb_names[sb]}.", fontsize=180*res_factor, y=1.01)
             for freq in range(64):
                 for feed in range(19):
                     center_x, center_y = 60, 60
@@ -147,13 +148,13 @@ def make_maps(map1_path, map1_dataname, map2_path="", map2_dataname="", name1=""
                         ax[freq,feed*3].imshow(sens1[feed,sb,freq], vmin=0, vmax=np.nanmax(sens1), cmap="gray_r", interpolation="nearest")
                         ax[freq,feed*3+1].imshow(sens2[feed,sb,freq], vmin=0, vmax=np.nanmax(sens1), cmap="gray_r", interpolation="nearest")
 
-                    ax[freq,feed*3].set_title(f"{name1}")
-                    ax[freq,feed*3+1].set_title(f"{name2}")
+                    ax[freq,feed*3].set_title(f"feed {feed+1}\n {sb_names[sb]} - ch {freq}\n {name1}", fontsize=10.0*res_factor)
+                    ax[freq,feed*3+1].set_title(f"{name2}", fontsize=10.0*res_factor)
 
                     if with_diff:
                         if mode == "sens":
                             ax[freq,feed*3+2].imshow(sens2[feed,sb,freq] - sens1[feed,sb,freq], vmin=-max(np.nanmax(sens1), np.nanmax(sens2)), vmax=max(np.nanmax(sens1), np.nanmax(sens2)), cmap="bwr", interpolation="nearest")
-                            ax[freq,feed*3+2].set_title(f"diff")
+                            ax[freq,feed*3+2].set_title(f"diff", fontsize=10.0*res_factor)
 
             plt.tight_layout()
             _filename = f"{out_filepath}_sb{sb}"
@@ -191,6 +192,8 @@ if __name__ == "__main__":
         out_filepath="/mn/stornext/d16/www_cmb/jonas/frequency_maps/null_splits/comp_ambt",
         title="ambt0elev0 vs ambt1elev0",
         compare=True,
+        with_diff=True,
+        res_factor=0.7,
     )
 
     
