@@ -27,7 +27,7 @@ def smooth_map(data, gauss_sigma=1.0):
     _map[~np.isfinite(data)] = 0.0
     return _map
 
-def make_maps(map1_path, map1_dataname, map2_path="", map2_dataname="", name1="", name2="", mode="sigma", compare=False, with_diff=False, out_filepath="", title="", smooth=True, res_factor=1.0):
+def make_maps(map1_path, map1_dataname, map2_path="", map2_dataname="", name1="", name2="", mode="sigma", compare=False, with_diff=False, out_filepath="", title="", smooth=True, res_factor=1.0, sidebands=[0,1,2,4]):
     """
         map1_path: Absolute filepath to first map.
         map1_dataname: Path to the dataset inside the hd5 file. Should be the path to the map-datafile, even if you want to plot rms or sens.
@@ -91,7 +91,7 @@ def make_maps(map1_path, map1_dataname, map2_path="", map2_dataname="", name1=""
         hitmap = np.array((sens1 + sens2) > 0.1*np.nanmax(sens1 + sens2, axis=(-1,-2))[:,:,:,None,None], dtype=float)
 
     if not compare:
-        for sb in trange(4):
+        for sb in tqdm(sidebands):
             fig, ax = plt.subplots(64, 19, figsize=(40*res_factor, 160*res_factor))
             fig.suptitle(f"{title} {sb_names[sb]}", fontsize=80*res_factor, y=1.005)
             for freq in range(64):
@@ -114,14 +114,12 @@ def make_maps(map1_path, map1_dataname, map2_path="", map2_dataname="", name1=""
                     ax[freq,feed].set_title(f"feed {feed+1}\n {sb_names[sb]} - ch {freq}", fontsize=10.0*res_factor)
             plt.tight_layout()
             _filename = f"{out_filepath}_sb{sb}"
-            if smooth:
-                _filename += "_smooth"
             _filename += ".png"
             plt.savefig(_filename, bbox_inches="tight")
             plt.clf()
 
     else: # If compare
-        for sb in trange(4):
+        for sb in tqdm(sidebands):
             fig, ax = plt.subplots(64, 19*3, figsize=(40*3*res_factor, 160*res_factor))
             fig.suptitle(f"{title}. {sb_names[sb]}.", fontsize=180*res_factor, y=1.01)
             for freq in range(64):
@@ -158,8 +156,6 @@ def make_maps(map1_path, map1_dataname, map2_path="", map2_dataname="", name1=""
 
             plt.tight_layout()
             _filename = f"{out_filepath}_sb{sb}"
-            if smooth:
-                _filename += "_smooth"
             _filename += ".png"
             plt.savefig(_filename, bbox_inches="tight")
             plt.clf()
@@ -183,17 +179,20 @@ if __name__ == "__main__":
     #     compare=True,
     # )
 
-    make_maps(
-        "/mn/stornext/d16/cmbco/comap/data/maps/co6_apr22_v4.2_null_no_rain_no_day_take2_even_splits_rnd2777849_n5_subtr_sigma_wn.h5",
-        "/multisplits/ambt/map_ambt0elev0",
-        "/mn/stornext/d16/cmbco/comap/data/maps/co6_apr22_v4.2_null_no_rain_no_day_take2_even_splits_rnd2777849_n5_subtr_sigma_wn.h5",
-        "/multisplits/ambt/map_ambt1elev0",
-        mode="sens",
-        out_filepath="/mn/stornext/d16/www_cmb/jonas/frequency_maps/null_splits/comp_ambt",
-        title="ambt0elev0 vs ambt1elev0",
-        compare=True,
-        with_diff=True,
-        res_factor=0.7,
-    )
+    mappath = "/mn/stornext/d16/cmbco/comap/data/power_spectrum/rnderrors_v4.2/average_spectra/co6_apr22_v4.2_null_no_rain_no_day_even_splits_take3_rnd1194182_n5_subtr_sigma_wn/co6_apr22_v4.2_null_no_rain_no_day_even_splits_take3_rnd1194182_n5_subtr_sigma_wn_average_fpxs.h5"
+    for split in ["ambt", "wind", "pres", "s01f", "sudi"]:
+        make_maps(
+            f"{mappath}",
+            f"/multisplits/{split}/map_{split}0elev0",
+            f"{mappath}",
+            f"/multisplits/{split}/map_{split}1elev0",
+            mode="sens",
+            out_filepath=f"/mn/stornext/d16/www_cmb/jonas/frequency_maps/null_splits/co6_comp_evenrise_new_{split}",
+            title=f"{split}0elev0 vs {split}1elev0",
+            compare=True,
+            with_diff=True,
+            res_factor=0.7,
+            sidebands=[0],
+        )
 
-    
+        
