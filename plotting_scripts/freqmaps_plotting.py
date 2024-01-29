@@ -49,6 +49,10 @@ def make_maps(map1_path, map1_dataname, map2_path="", map2_dataname="", name1=""
     with h5py.File(map1_path, "r") as f:
         map1 = f[map1_dataname][()]
         rms1 = f[map1_dataname.replace("map", "sigma_wn")][()]
+    
+    Nfeeds = map1.shape[0]  # Number of "feeds", or alternatively, saddlebags.
+    if Nfeeds == 20:
+        Nfeeds = 19  # Not interested in feed 20.
 
     map1[map1 == 0] = np.nan
     rms1[~np.isfinite(rms1)] = np.inf
@@ -56,7 +60,7 @@ def make_maps(map1_path, map1_dataname, map2_path="", map2_dataname="", name1=""
     if mode == "sigma":
         map1 = map1/rms1
         if smooth:
-            for feed in range(19):
+            for feed in range(Nfeeds):
                 for sb in range(4):
                     for freq in range(64):
                         map1[feed,sb,freq] = smooth_map(map1[feed,sb,freq])
@@ -77,7 +81,7 @@ def make_maps(map1_path, map1_dataname, map2_path="", map2_dataname="", name1=""
         if mode == "sigma":
             map2 = map2/rms2
             if smooth:
-                for feed in range(19):
+                for feed in range(Nfeeds):
                     for sb in range(4):
                         for freq in range(64):
                             map2[feed,sb,freq] = smooth_map(map2[feed,sb,freq])
@@ -91,11 +95,11 @@ def make_maps(map1_path, map1_dataname, map2_path="", map2_dataname="", name1=""
         hitmap = np.array((sens1 + sens2) > 0.1*np.nanmax(sens1 + sens2, axis=(-1,-2))[:,:,:,None,None], dtype=float)
 
     if not compare:
-        for sb in tqdm(sidebands):
-            fig, ax = plt.subplots(64, 19, figsize=(40*res_factor, 160*res_factor))
+        for sb in sidebands:
+            fig, ax = plt.subplots(64, Nfeeds, figsize=(2*Nfeeds*res_factor, 160*res_factor))
             fig.suptitle(f"{title} {sb_names[sb]}", fontsize=80*res_factor, y=1.005)
             for freq in range(64):
-                for feed in range(19):
+                for feed in range(Nfeeds):
                     center_x, center_y = 60, 60
                     if np.sum(hitmap[feed,sb,freq]) > 0:
                         center_x = int(np.mean(np.argwhere(np.sum(hitmap[feed,sb,freq], axis=0))))
@@ -119,11 +123,12 @@ def make_maps(map1_path, map1_dataname, map2_path="", map2_dataname="", name1=""
             plt.clf()
 
     else: # If compare
-        for sb in tqdm(sidebands):
-            fig, ax = plt.subplots(64, 19*3, figsize=(40*3*res_factor, 160*res_factor))
+        for sb in sidebands:
+            fig, ax = plt.subplots(64, Nfeeds*3, figsize=(2*Nfeeds*3*res_factor, 160*res_factor))
             fig.suptitle(f"{title}. {sb_names[sb]}.", fontsize=180*res_factor, y=1.01)
+            vmax_sens = max(np.nanmax(sens1), np.nanmax(sens2))
             for freq in range(64):
-                for feed in range(19):
+                for feed in range(Nfeeds):
                     center_x, center_y = 60, 60
                     if np.sum(hitmap[feed,sb,freq]) > 0:
                         center_x = int(np.mean(np.argwhere(np.sum(hitmap[feed,sb,freq], axis=0))))
@@ -143,15 +148,19 @@ def make_maps(map1_path, map1_dataname, map2_path="", map2_dataname="", name1=""
                         ax[freq,feed*3].imshow(rms1[feed,sb,freq], vmin=0, vmax=5*np.nanmin(rms1), cmap="gray", interpolation="nearest")
                         ax[freq,feed*3+1].imshow(rms2[feed,sb,freq], vmin=0, vmax=5*np.nanmin(rms1), cmap="gray", interpolation="nearest")
                     elif mode == "sens":
-                        ax[freq,feed*3].imshow(sens1[feed,sb,freq], vmin=0, vmax=np.nanmax(sens1), cmap="gray_r", interpolation="nearest")
-                        ax[freq,feed*3+1].imshow(sens2[feed,sb,freq], vmin=0, vmax=np.nanmax(sens1), cmap="gray_r", interpolation="nearest")
+                        ax[freq,feed*3].imshow(sens1[feed,sb,freq], vmin=0, vmax=vmax_sens, cmap="gray_r", interpolation="nearest")
+                        ax[freq,feed*3+1].imshow(sens2[feed,sb,freq], vmin=0, vmax=vmax_sens, cmap="gray_r", interpolation="nearest")
 
                     ax[freq,feed*3].set_title(f"feed {feed+1}\n {sb_names[sb]} - ch {freq}\n {name1}", fontsize=10.0*res_factor)
                     ax[freq,feed*3+1].set_title(f"{name2}", fontsize=10.0*res_factor)
 
                     if with_diff:
                         if mode == "sens":
-                            ax[freq,feed*3+2].imshow(sens2[feed,sb,freq] - sens1[feed,sb,freq], vmin=-max(np.nanmax(sens1), np.nanmax(sens2)), vmax=max(np.nanmax(sens1), np.nanmax(sens2)), cmap="bwr", interpolation="nearest")
+                            sens1[feed,sb,freq,center_x-31:center_x-33, center_y-31] = -999999
+                            sens1[feed,sb,freq,center_x-31:center_x-33, center_y-30] =  999999
+                            sens2[feed,sb,freq,center_x-31:center_x-33, center_y-31] = -9999999
+                            sens2[feed,sb,freq,center_x-31:center_x-33, center_y-30] =  9999999
+                            ax[freq,feed*3+2].imshow(sens2[feed,sb,freq] - sens1[feed,sb,freq], vmin=-0.5*vmax_sens, vmax=0.5*vmax_sens, cmap="bwr", interpolation="nearest")
                             ax[freq,feed*3+2].set_title(f"diff", fontsize=10.0*res_factor)
 
             plt.tight_layout()
@@ -179,20 +188,50 @@ if __name__ == "__main__":
     #     compare=True,
     # )
 
-    mappath = "/mn/stornext/d16/cmbco/comap/data/power_spectrum/rnderrors_v4.2/average_spectra/co6_apr22_v4.2_null_no_rain_no_day_even_splits_take3_rnd1194182_n5_subtr_sigma_wn/co6_apr22_v4.2_null_no_rain_no_day_even_splits_take3_rnd1194182_n5_subtr_sigma_wn_average_fpxs.h5"
-    for split in ["ambt", "wind", "pres", "s01f", "sudi"]:
+    primary_split = "elev0"
+    mappath = "/mn/stornext/d16/cmbco/comap/data/maps/co6_apr22_v4.2_null_no_rain_no_day_even_splits_take3_rnd1194182_n5_subtr_sigma_wn.h5"
+    for split in tqdm([
+                "ambt",
+                "wind",
+                "wint",
+                "half",
+                "odde",
+                "dayn",
+                "dtmp",
+                "hmty",     
+                "pres",      
+                "rain", 
+                "wthr",
+                "sune",
+                "modi",
+                "sudi",
+                "tsys",
+                "azmp",
+                "fpoO",
+                "fpoI",
+                "apoO",
+                "apoI",
+                "spoO",
+                "spoI",
+                "rndA",
+                "rndB",
+                "npca",
+                "pcaa",
+                "s01f",
+                "fk1f",
+                "al1f",
+                "obhf",
+                "azdr"]):
         make_maps(
             f"{mappath}",
-            f"/multisplits/{split}/map_{split}0elev0",
+            f"/multisplits/{split}/map_saddlebag_{split}0{primary_split}",
             f"{mappath}",
-            f"/multisplits/{split}/map_{split}1elev0",
+            f"/multisplits/{split}/map_saddlebag_{split}1{primary_split}",
             mode="sens",
-            out_filepath=f"/mn/stornext/d16/www_cmb/jonas/frequency_maps/null_splits/co6_comp_evenrise_new_{split}",
-            title=f"{split}0elev0 vs {split}1elev0",
+            out_filepath=f"/mn/stornext/d16/www_cmb/jonas/frequency_maps/null_splits/norain_noday/co6_comp_{primary_split}_{split}_sb",
+            title=f"{split}0elev0 \nvs {split}1elev0",
             compare=True,
             with_diff=True,
-            res_factor=0.7,
+            res_factor=1.0,
             sidebands=[0],
         )
-
-        
