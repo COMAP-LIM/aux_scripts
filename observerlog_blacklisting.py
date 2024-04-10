@@ -14,6 +14,7 @@ with rs.get(url=url) as res:
 
 blacklist = []
 blacklist_reason = []
+blacklist_mask = np.zeros((100000, 20, 4), dtype=bool)
 with open("google.csv", "r") as csv_file:
     csv_reader = csv.reader(csv_file, delimiter=',')
 
@@ -21,6 +22,26 @@ with open("google.csv", "r") as csv_file:
     for row in csv_reader:
         startID = int(row[0])
         stopID = row[1]
+        feeds = row[2]
+        sidebands = row[3]
+        if sidebands == "all":
+            masked_sbs = (0,1,2,3)
+        elif sidebands == "bandA":
+            masked_sbs = (0,1)
+        elif sidebands == "bandB":
+            masked_sbs = (2,3)
+        mask = np.zeros((20,4), dtype=bool)
+        try:
+            feed = int(feeds)
+            mask[feed-1,masked_sbs] = True
+        except:
+            pass
+        if feeds == "all":
+            mask[:,masked_sbs] = True
+        if "," in feeds:
+            feeds = feeds.split(",")
+            for feed in feeds:
+                mask[int(feed)-1,masked_sbs] = True
         try:
             dataflag = int(row[4])
         except:
@@ -31,14 +52,17 @@ with open("google.csv", "r") as csv_file:
         elif stopID == "":
             stopID = startID
         elif stopID == "ongoing":
-            stopID = 99999
+            stopID = 100000
 
         if dataflag == 0 or reason in additional_blacklists:
             for i in range(startID, stopID+1, 1):
                 blacklist.append(i)
                 blacklist_reason.append(reason)
 
-with open("/mn/stornext/d22/cmbco/comap/protodir/auxiliary/blacklists/blacklist_observerlog.txt", "w") as f:
+                blacklist_mask[i] |= mask
+
+with open("/mn/stornext/d16/cmbco/comap/data/aux_data/blacklists/blacklist_observerlog.txt", "w") as f:
     for i in range(len(blacklist)):
         f.write(f"{blacklist[i]} {blacklist_reason[i]}\n")
-np.save("/mn/stornext/d22/cmbco/comap/protodir/auxiliary/blacklists/blacklist_observerlog.npy", np.array(blacklist))
+np.save("/mn/stornext/d16/cmbco/comap/data/aux_data/blacklists/blacklist_observerlog.npy", np.array(blacklist))
+np.save("/mn/stornext/d16/cmbco/comap/data/aux_data/blacklists/blacklist_mask_observerlog.npy", np.array(blacklist_mask))
