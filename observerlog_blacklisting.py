@@ -52,7 +52,7 @@ with open("google.csv", "r") as csv_file:
         elif stopID == "":
             stopID = startID
         elif stopID == "ongoing":
-            stopID = 100000
+            stopID = 99999
 
         if dataflag == 0 or reason in additional_blacklists:
             for i in range(startID, stopID+1, 1):
