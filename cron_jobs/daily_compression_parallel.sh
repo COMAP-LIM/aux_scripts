@@ -3,9 +3,9 @@ export PATH=/net/alruba2.uio.no/mn/alruba2/astro/local/opt/intel/oneapi/compiler
 
 echo "Running parallel daily compression at $(date)."
 
-sourcepath="/mn/stornext/d16/cmbco/comap/data/level1/l1_temp/from_ovro"
-temppath="/mn/stornext/d16/cmbco/comap/data/level1/l1_temp/compressed"
-destpath="/mn/stornext/d16/cmbco/comap/data/level1"
+sourcepath="/mn/stornext/d22/cmbco_nobackup/comap/data/level1/l1_temp/from_ovro"
+temppath="/mn/stornext/d22/cmbco_nobackup/comap/data/level1/l1_temp/compressed"
+destpath="/mn/stornext/d22/cmbco_nobackup/comap/data/level1"
 
 process_file() {
     filepath="$1"
@@ -17,33 +17,46 @@ process_file() {
     # Check if the filename starts with "comap-" and ends with ".hd5"
     if [[ $filename == comap-*.hd5 ]]; then
         if h5dump -a comap/source "$filepath" | grep -qE "co[267]"; then
-            echo "File" $filename "contains a CO field. Continuing."
+            echo "File $filename contains a CO field. Continuing."
 
             reldir=$(dirname "$filepath" | sed "s|$sourcepath/||")
 
-            echo "Repacking $filename to $temppath/$reldir"
+            # Extract the directory and filename parts
+            directory=$(dirname "$filepath")
+            base_filename=$(basename "$filepath")
+            working_filename="working_$base_filename"
+            working_filepath="$directory/$working_filename"
+
+            # Rename the file by appending "working_" to its name
+            mv "$filepath" "$working_filepath"
+
+            echo "Repacking $working_filename to $temppath/$reldir"
             h5repack -f /spectrometer/tod:SHUF \
                     -f /spectrometer/tod:GZIP=3 \
                     -l /spectrometer/tod:CHUNK=1x4x1024x4000 \
-                    "$filepath" "$temppath/$reldir/$filename"
+                    "$working_filepath" "$temppath/$reldir/$working_filename"
 
             # Check if h5repack succeeded
             if [ $? -ne 0 ]; then
-                echo "h5repack failed for $filename. Skipping further processing for this file."
+                echo "h5repack failed for $working_filename. Skipping further processing for this file."
+                mv "$working_filepath" "$filepath" # Revert file renaming before exiting
                 return
             fi
 
-            echo "Moving repacked $filename to $destpath/$reldir"
-            /usr/cvfs/bin/cvcp -ad "$temppath/$reldir/$filename" "$destpath/$reldir/"
+            # Revert the renaming for final copying
+            final_dest_filename=$base_filename
+
+            echo "Moving repacked $working_filename to $destpath/$reldir as $final_dest_filename"
+            /usr/cvfs/bin/cvcp -ad "$temppath/$reldir/$working_filename" "$destpath/$reldir/$final_dest_filename"
+
             echo "Removing write permission for $destpath/$reldir"
-            chgrp astcomap $destpath/$reldir/$filename
-            chmod a-w $destpath/$reldir/$filename
+            chgrp astcomap "$destpath/$reldir/$final_dest_filename"
+            chmod a-w "$destpath/$reldir/$final_dest_filename"
 
-            echo "Deleting original $filename"
-            rm "$filepath"
-            echo "Deleting temp file $temppath/$reldir/$filename"
-            rm "$temppath/$reldir/$filename"
-
+            echo "Deleting original file $working_filename"
+            rm "$working_filepath"
+            echo "Deleting temp file $temppath/$reldir/$working_filename"
+            rm "$temppath/$reldir/$working_filename"
         else
             echo "File" $filename "is not a co2, co6, or co7 file. Deleting."
             rm "$filepath"
