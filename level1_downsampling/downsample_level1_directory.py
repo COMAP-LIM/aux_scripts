@@ -26,6 +26,11 @@ Arguments:
     -y, --time-factor : Time downsampling factor.
     -p, --processes   : Number of concurrent parallel workers (default: 4).
                         WARNING: Do not exceed your node's allocated CPU cores.
+
+* Fragmentation and disk usage: I have noticed that files tend to reduce in size if I perform a raw
+  h5repack on the final output from this script. This is probably because it defragments the files.
+  I would recommend doing so to reduce final disk usage by something like 5-10%.
+  Doing so serially after all compression is finished is also probably optimal.
 """
 
 import argparse

@@ -31,9 +31,10 @@ structure from scratch, it inherently alters advanced internal HDF5 features:
 
 System Considerations:
 --------------------
-* Fragmentation and disk usage: I have noticed that files tend to reduce in size if a perform a raw
+* Fragmentation and disk usage: I have noticed that files tend to reduce in size if I perform a raw
   h5repack on the final output from this script. This is probably because it defragments the files.
   I would recommend doing so to reduce final disk usage by something like 5-10%.
+  Doing so serially after all compression is finished is also probably optimal.
 """
 
 import argparse
@@ -178,15 +179,12 @@ def downsample_comap_file(input_path, output_path, freq_factor, time_factor):
         crop_end = remainder
         n_time_downsampled = (n_time_orig - crop_end) // Y
 
-        tod_time_chunk = 4000 // Y
+        # HDF5 forbids a chunk dimension larger than the dataset dimension, so short observations
+        # (a handful exist, down to ~500 raw samples) get the TOD chunk clipped to the full axis.
+        tod_time_chunk = min(4000 // Y, n_time_downsampled)
         if tod_time_chunk <= 0:
             raise ValueError(
                 f"Time downsampling factor Y ({Y}) is too large for the fixed TOD chunking policy."
-            )
-        if tod_time_chunk > n_time_downsampled:
-            raise ValueError(
-                "The fixed TOD chunking policy is incompatible with the downsampled time axis. "
-                f"Got output time length {n_time_downsampled}, but the chunk length would be {tod_time_chunk}."
             )
 
         with h5py.File(output_path, 'w', rdcc_nbytes=CACHE_SIZE) as fout:
@@ -224,7 +222,7 @@ def downsample_comap_file(input_path, output_path, freq_factor, time_factor):
                         creation_kwargs['compression'] = 'gzip'
                         creation_kwargs['compression_opts'] = 3
                         creation_kwargs['shuffle'] = True
-                        creation_kwargs['chunks'] = (1, 4, 1024 // X, 4000 // Y)
+                        creation_kwargs['chunks'] = (1, 4, 1024 // X, tod_time_chunk)
                     else:
                         # Enforce strict uncompressed state for all auxiliary and metadata entries
                         creation_kwargs['compression'] = None
