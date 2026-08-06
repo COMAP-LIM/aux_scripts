@@ -5,18 +5,41 @@ import sys
 import numpy as np
 import h5py
 from os import listdir, makedirs
-from os.path import isfile, join, exists
+from os.path import isfile, isdir, join, exists
+import re
 import time
 from tqdm import trange, tqdm
 from tsysmeasure import TsysMeasure
 import multiprocessing as mp
 import argparse
 
+L1_PATH = "/mn/stornext/d16/cmbco/comap/data/level1"
+MONTH_DIR = re.compile(r"\d{4}-\d{2}")
+
+
+def resolve_months(months, l1_path):
+    """Expand the --months argument, turning "all" into every month present in the level1 tree.
+
+    Args:
+        months: The months given on the command line, or ["all"].
+        l1_path: Root of the level1 data tree to scan when "all" is given.
+
+    Returns:
+        Sorted list of YYYY-MM month names. Passing "all" (in any position) scans l1_path for
+        directories matching the YYYY-MM pattern, so a full rebuild needs no explicit list; the
+        per-field directories (wide/, ncp/, l1_temp/) are skipped by the pattern.
+    """
+    if any(month.lower() == "all" for month in months):
+        months = sorted(d for d in listdir(l1_path) if MONTH_DIR.fullmatch(d) and isdir(join(l1_path, d)))
+        print(f"Month 'all' given: found {len(months)} month directories in {l1_path}.")
+        return months
+    return sorted(months)
+
 
 def worker(fileidx):
     if fileidx < Nthreads:
-        print(f"Worker {fileidx} waiting {fileidx*10} seconds.")
-        time.sleep(fileidx*10)
+        print(f"Worker {fileidx} waiting {fileidx*30} seconds.")
+        time.sleep(fileidx*30)
 
     t0 = time.time()
     filename = filenames[fileidx]
@@ -46,6 +69,14 @@ def worker(fileidx):
         G = np.zeros((20, 4, 1024))
         G[feeds-1] = Tsys.G
         calib_indices_tod = Tsys.calib_startstopindices_tod
+        # Per-dip diagnostics, so a later cut can be made without re-reading the level1 data.
+        tsys_vane = np.zeros((20, 2)) + np.nan          # Tsys implied by each individual dip.
+        tsys_vane[feeds-1] = Tsys.Tsys_vane
+        phot_finite_frac = np.zeros((20, 2)) + np.nan   # Finite fraction of the Phot spectrum.
+        phot_finite_frac[feeds-1] = Tsys.Phot_finite_frac
+        feed_usable = np.zeros(20, dtype=bool)          # Feed has at least one surviving dip.
+        feed_usable[feeds-1] = Tsys.feed_usable
+        n_vane_runs = Tsys.n_vane_runs                  # Vane flag activations found (expect 2).
  
     except:
         print(f"Tsys failed for {obsid}.")
@@ -60,6 +91,10 @@ def worker(fileidx):
         tsys = np.zeros((20, 4, 1024)) + np.nan
         G = np.zeros((20, 4, 1024)) + np.nan
         calib_indices_tod = np.zeros_like((2, 2)) + np.nan
+        tsys_vane = np.zeros((20, 2)) + np.nan
+        phot_finite_frac = np.zeros((20, 2)) + np.nan
+        feed_usable = np.zeros(20, dtype=bool)
+        n_vane_runs = 0
 
     
     with h5py.File(f"{args.path}/{obsid}.h5", "w") as outfile:
@@ -74,6 +109,10 @@ def worker(fileidx):
         outfile.create_dataset("calib_indices_tod", data=calib_indices_tod)
         outfile.create_dataset("Tsys_obsidmean", data=tsys)
         outfile.create_dataset("G_obsidmean", data=G)
+        outfile.create_dataset("Tsys_vane", data=tsys_vane)
+        outfile.create_dataset("Phot_finite_frac", data=phot_finite_frac)
+        outfile.create_dataset("feed_usable", data=feed_usable)
+        outfile.create_dataset("n_vane_runs", data=n_vane_runs)
     del(Tsys)
     
     print(f"Obsid {obsid} finished in {time.time()-t0:.2f} seconds.")
@@ -81,17 +120,16 @@ def worker(fileidx):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-n", "--nthreads", type=int, default=15, help="Number of threads to use. Memory requirement: ca 60GB/thread.")
-    parser.add_argument("-m", "--months", type=str, nargs="+", required=True, help="Months to include in database. Eg. -m 2021-02 2021-03 2021-04.")
-    parser.add_argument("-p", "--path", type=str, default="level1_database_files", help="Path where the database files will be written.")
+    parser.add_argument("-m", "--months", type=str, nargs="+", required=True, help="Months to include in database. Eg. -m 2021-02 2021-03 2021-04. Pass -m all to use every YYYY-MM month directory found in the level1 tree.")
+    parser.add_argument("-p", "--path", type=str, default="/mn/stornext/d16/cmbco/comap/data/aux_data/level1_database_files/", help="Path where the database files will be written.")
+    parser.add_argument("-l", "--level1-path", type=str, default=L1_PATH, help=f"Root of the level1 data tree to read observations from. Default: {L1_PATH}.")
     parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite database files, if they already exist.")
     args = parser.parse_args()
     Nthreads = args.nthreads
     if not exists(args.path):
         makedirs(args.path)
         print(f"Path {args.path} does not already exist. Creating dir.")
-    months = []
-    for month in args.months:
-        months.append(month)
+    months = resolve_months(args.months, args.level1_path)
     blacklist = []
     if not args.overwrite:
         print(f"Creating list of already existing files...")
@@ -105,7 +143,7 @@ if __name__ == "__main__":
         print(f"Writing in append mode. Ignoring {len(blacklist)} already existing files.")
     filenames = []
     for month in months:
-        path = f"/mn/stornext/d16/cmbco/comap/data/level1/{month}/"
+        path = join(args.level1_path, month)
         if exists(path):
             for f in listdir(path):
                 if isfile(join(path, f)):
